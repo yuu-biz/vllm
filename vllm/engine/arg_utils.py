@@ -15,7 +15,8 @@ from vllm.config import (CacheConfig, CompilationConfig, ConfigFormat,
                          LoRAConfig, ModelConfig, ObservabilityConfig,
                          ParallelConfig, PoolerConfig, PromptAdapterConfig,
                          SchedulerConfig, SpeculativeConfig, TaskOption,
-                         TokenizerPoolConfig, VllmConfig)
+                         TokenizerPoolConfig, VllmConfig, ControlVectorConfig)
+
 from vllm.executor.executor_base import ExecutorBase
 from vllm.logger import init_logger
 from vllm.model_executor.layers.quantization import QUANTIZATION_METHODS

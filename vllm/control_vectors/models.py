@@ -3,14 +3,18 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type
 
 from torch import nn
-
+from huggingface_hub import hf_hub_download
+import torch
+import numpy as np
 from vllm.adapter_commons.models import (AdapterLRUCache, AdapterModel,
                                          AdapterModelManager)
 from vllm.adapter_commons.utils import (add_adapter, deactivate_adapter,
-                                        get_adapter, set_adapter_mapping)
+                                        get_adapter, list_adapters,
+                                        remove_adapter, set_adapter_mapping)
 from vllm.config import ControlVectorConfig
 from vllm.control_vectors.layers import (ControlVectorMapping,
                                          MLPWithControlVector)
+import gguf
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +37,7 @@ def parse_number_from_string(s: str) -> int:
             return int(part)
     return None
 
+
 def load_control_vector_file(file_path, revision="main"):
     try:
         if Path(file_path).exists():
@@ -41,12 +46,15 @@ def load_control_vector_file(file_path, revision="main"):
         repo_id = "/".join(parts[:2])
         file_name = "/".join(parts[2:])
 
-        return hf_hub_download(repo_id=repo_id, filename=file_name, revision=revision)
+        return hf_hub_download(repo_id=repo_id,
+                               filename=file_name,
+                               revision=revision)
     except FileNotFoundError as e:
         raise FileNotFoundError(f"File not found: {file_path}")
     except Exception as e:
         raise RuntimeError(f"An unexpected error occurred: {e}")
-    
+
+
 class ControlVectorModel(AdapterModel):
 
     def __init__(self,
@@ -66,7 +74,7 @@ class ControlVectorModel(AdapterModel):
         device: str = "cuda",
         scale_factor: float = 1.0,
     ) -> "ControlVectorModel":
-        
+
         try:
             file_path = load_control_vector_file(control_vector_model_path)
             reader = gguf.GGUFReader(file_path)
@@ -75,16 +83,20 @@ class ControlVectorModel(AdapterModel):
             if not archf or not len(archf.parts):
                 logger.error(".gguf file missing architecture field")
             else:
-                arch = str(bytes(archf.parts[-1]), encoding="utf-8", errors="replace")
+                arch = str(bytes(archf.parts[-1]),
+                           encoding="utf-8",
+                           errors="replace")
                 if arch != "controlvector":
                     logger.error(
-                        f".gguf file with architecture {arch!r} does not appear to be a control vector!"
+                        f".gguf file with architecture {arch!r} does not " \
+                            "appear to be a control vector!"
                     )
             modelf = reader.get_field('controlvector.model_hint')
 
             if not modelf or not len(modelf.parts):
-                raise ValueError(".gguf file missing controlvector.model_hint field")
-            
+                raise ValueError(
+                    ".gguf file missing controlvector.model_hint field")
+
             model_hint = str(bytes(modelf.parts[-1]), encoding="utf-8")
             logger.info(f"Control Vector for {model_hint} loaded.")
             cv_weights = {}
@@ -94,19 +106,25 @@ class ControlVectorModel(AdapterModel):
                 try:
                     layer = int(tensor.name.split(".")[1])
                 except ValueError:
-                    raise ValueError(f".gguf file has invalid direction field name: {tensor.name}")
+                    raise ValueError(
+                        f".gguf file has invalid direction field name: "\
+                            "{tensor.name}"
+                    )
                 np_copy = np.array(tensor.data, copy=True)
-                cv_weights[layer] = torch.from_numpy(np_copy).to(device).to(config.adapter_dtype)
+                cv_weights[layer] = torch.from_numpy(np_copy).to(device).to(
+                    config.adapter_dtype)
 
             return cls(control_vector_id, cv_weights, scale_factor)
-        
+
         except FileNotFoundError:
-            logger.error(f"Control vector file not found: {control_vector_model_path}")
+            logger.error(
+                f"Control vector file not found: {control_vector_model_path}")
             raise
         except Exception as e:
-            logger.error(f"An error occurred while loading the control vector: {e}")
+            logger.error(
+                f"An error occurred while loading the control vector: {e}")
             raise
-        
+
 
 
 class ControlVectorModelManager(AdapterModelManager):
@@ -126,12 +144,11 @@ class ControlVectorModelManager(AdapterModelManager):
 
     @property
     def adapter_slots(self) -> int:
-        return self.control_vector_config.max_control_vectors
+        return self.capacity
 
     @property
     def capacity(self) -> int:
-        return self.control_vector_config.max_control_vectors - len(
-            self._active_adapters)
+        return self.control_vector_config.max_control_vectors
 
     def activate_adapter(
         self,
@@ -152,10 +169,11 @@ class ControlVectorModelManager(AdapterModelManager):
                      control_vector_model.id, index)
         self.control_vector_index_to_id[index] = control_vector_model.id
         for k, v in self.modules.items():
-            index = parse_number_from_string(k)
-            if index < len(control_vector_model.control_vector_weights):
+            layer_index = parse_number_from_string(k)
+            if layer_index in control_vector_model.control_vector_weights:
                 v.set_control_vector(
-                    index, control_vector_model.control_vector_weights[index] *
+                    index,
+                    control_vector_model.control_vector_weights[layer_index] *
                     control_vector_model.scale_factor)
         return True
 
@@ -182,11 +200,11 @@ class ControlVectorModelManager(AdapterModelManager):
 
         for k, v in self.modules.items():
             v.set_active_tensor(index)
-    
-    def remove_adapter(self, adapter_id: int)-> bool:
+
+    def remove_adapter(self, adapter_id: int) -> bool:
         if adapter_id in self._registered_adapters:
             del self._registered_adapters[adapter_id]
-    
+
     def _create_cv_modules(self):
         for module_name, module in self.model.named_modules():
             for key in _all_cv_classes:
@@ -198,8 +216,9 @@ class ControlVectorModelManager(AdapterModelManager):
                     self.model, module_name, _all_cv_classes[key](module))
                 new_module.set_layer_id(parse_number_from_string(module_name))
                 self.register_module(module_name, new_module)
-                new_module.set_normalization(self.control_vector_config.normalize)
-        
+                new_module.set_normalization(
+                    self.control_vector_config.normalize)
+
     def replace_submodule(self, model: nn.Module, module_name: str,
                           new_module: nn.Module) -> nn.Module:
         """Replace a submodule in a model with a new module."""
@@ -228,8 +247,12 @@ class ControlVectorModelManager(AdapterModelManager):
         self._last_mapping = set_adapter_mapping(mapping, self._last_mapping,
                                                  self._set_adapter_mapping)
 
+    def remove_adapter(self, adapter_id: int) -> bool:
+        return remove_adapter(adapter_id, self._registered_adapters,
+                              self.deactivate_adapter)
+
     def list_adapters(self) -> Dict[int, Any]:
-        return self.list_adapters(self._registered_adapters)
+        return list_adapters(self._registered_adapters)
 
     def get_adapter(self, adapter_id: int) -> Optional[Any]:
         return get_adapter(adapter_id, self._registered_adapters)
