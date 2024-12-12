@@ -1432,6 +1432,7 @@ class ParallelSampleSequenceGroup(SequenceGroupBase):
             encoder_seq=seq_group.encoder_seq,
             trace_headers=seq_group.trace_headers,
             prompt_adapter_request=seq_group.prompt_adapter_request,
+            control_vector_request=seq_group.control_vector_request,
             priority=seq_group.priority,
         )
 
