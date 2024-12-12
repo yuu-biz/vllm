@@ -1,4 +1,9 @@
-from typing import Any, Callable, Dict, Optional, List, Type
+import logging
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Type
+
+import gguf
+
 from vllm.adapter_commons.models import (AdapterLRUCache, AdapterModel,
                                          AdapterModelManager)
 from torch import nn
@@ -12,9 +17,6 @@ from vllm.adapter_commons.utils import (add_adapter, deactivate_adapter,
                                         remove_adapter, set_adapter_mapping)
 from vllm.config import ControlVectorConfig
 
-from pathlib import Path
-import gguf
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +52,9 @@ def load_control_vector_file(file_path, revision="main"):
                                filename=file_name,
                                revision=revision)
     except FileNotFoundError as e:
-        raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}") from e
     except Exception as e:
-        raise RuntimeError(f"An unexpected error occurred: {e}")
+        raise RuntimeError(f"An unexpected error occurred: {e}") from e
 
 
 class ControlVectorModel(AdapterModel):
@@ -88,9 +90,8 @@ class ControlVectorModel(AdapterModel):
                            errors="replace")
                 if arch != "controlvector":
                     logger.error(
-                        f".gguf file with architecture {arch!r} does not " \
-                            "appear to be a control vector!"
-                    )
+                        ".gguf file with arch %s is not a control vector",
+                        arch)
             modelf = reader.get_field('controlvector.model_hint')
 
             if not modelf or not len(modelf.parts):
@@ -98,32 +99,25 @@ class ControlVectorModel(AdapterModel):
                     ".gguf file missing controlvector.model_hint field")
 
             model_hint = str(bytes(modelf.parts[-1]), encoding="utf-8")
-            logger.info(f"Control Vector for {model_hint} loaded.")
+            logger.info("Control Vector for %s loaded.", model_hint)
             cv_weights = {}
             for tensor in reader.tensors:
                 if not tensor.name.startswith("direction."):
                     continue
                 try:
                     layer = int(tensor.name.split(".")[1])
-                except ValueError:
+                except ValueError as e:
                     raise ValueError(
-                        f".gguf file has invalid direction field name: "\
-                            "{tensor.name}"
-                    )
+                        ".gguf file has invalid direction field name: %s",
+                        tensor.name) from e
                 np_copy = np.array(tensor.data, copy=True)
                 cv_weights[layer] = torch.from_numpy(np_copy).to(device).to(
                     config.adapter_dtype)
 
             return cls(control_vector_id, cv_weights, scale_factor)
 
-        except FileNotFoundError:
-            logger.error(
-                f"Control vector file not found: {control_vector_model_path}")
-            raise
         except Exception as e:
-            logger.error(
-                f"An error occurred while loading the control vector: {e}")
-            raise
+            raise e
 
 
 
@@ -200,10 +194,6 @@ class ControlVectorModelManager(AdapterModelManager):
 
         for k, v in self.modules.items():
             v.set_active_tensor(index)
-
-    def remove_adapter(self, adapter_id: int) -> bool:
-        if adapter_id in self._registered_adapters:
-            del self._registered_adapters[adapter_id]
 
     def _create_cv_modules(self):
         for module_name, module in self.model.named_modules():

@@ -983,8 +983,8 @@ class SequenceGroupMetadata(
 
     @property
     def control_vector_id(self) -> int:
-        return (self.control_vector_request.adapter_id
-                if self.control_vector_request else 0)
+        return self.control_vector_request.adapter_id \
+            if self.control_vector_request else 0
 
     # Multi-Step Chunked-Prefill property
     @property
