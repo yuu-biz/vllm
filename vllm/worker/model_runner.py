@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import torch.distributed
 import torch.nn as nn
+import gguf
 
 import vllm.envs as envs
 from vllm.attention import AttentionMetadata, get_attn_backend
@@ -384,7 +385,6 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             self.multi_modal_placeholder_maps = multi_modal_placeholder_maps
 
             self.control_vector_request = control_vector_request
-            self.control_vector_mapping = control_vector_mapping
 
             self.prefix_cache_hit = prefix_cache_hit
 
@@ -994,7 +994,6 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             )
 
         control_vector_requests: Set[ControlVectorRequest] = set()
-        # control_vector_mapping = None
         if self.enable_control_vector:
             control_vector_requests = set(
                 data.control_vector_request for data in self.inter_data_list
