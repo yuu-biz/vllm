@@ -622,6 +622,7 @@ class LLMEngine:
                 lora_request=lora_request,
                 trace_headers=trace_headers,
                 prompt_adapter_request=prompt_adapter_request,
+                control_vector_request=control_vector_request,
                 priority=priority,
             )
             return None
