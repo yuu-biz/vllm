@@ -404,13 +404,6 @@ class EngineArgs:
                             help='Model context length. If unspecified, will '
                             'be automatically derived from the model config.')
         parser.add_argument(
-            "--max-model-len",
-            type=int,
-            default=EngineArgs.max_model_len,
-            help="Model context length. If unspecified, will "
-            "be automatically derived from the model config.",
-        )
-        parser.add_argument(
             "--guided-decoding-backend",
             type=str,
             default='xgrammar',
@@ -453,20 +446,6 @@ class EngineArgs:
                             type=int,
                             default=EngineArgs.tensor_parallel_size,
                             help='Number of tensor parallel replicas.')
-        parser.add_argument(
-            "--pipeline-parallel-size",
-            "-pp",
-            type=int,
-            default=EngineArgs.pipeline_parallel_size,
-            help="Number of pipeline stages.",
-        )
-        parser.add_argument(
-            "--tensor-parallel-size",
-            "-tp",
-            type=int,
-            default=EngineArgs.tensor_parallel_size,
-            help="Number of tensor parallel replicas.",
-        )
         parser.add_argument(
             "--max-parallel-loading-workers",
             type=int,
@@ -1074,32 +1053,6 @@ class EngineArgs:
                             help='The configurations for distributed KV cache '
                             'transfer. Should be a JSON string.')
 
-        parser.add_argument(
-            "--compilation-config",
-            "-O",
-            type=CompilationConfig.from_cli,
-            default=None,
-            help="torch.compile configuration for the model."
-            "When it is a number (0, 1, 2, 3), it will be "
-            "interpreted as the optimization level.\n"
-            "NOTE: level 0 is the default level without "
-            "any optimization. level 1 and 2 are for internal "
-            "testing only. level 3 is the recommended level "
-            "for production.\n"
-            "To specify the full compilation config, "
-            "use a JSON string.\n"
-            "Following the convention of traditional "
-            "compilers, using -O without space is also "
-            "supported. -O3 is equivalent to -O 3.",
-        )
-
-        parser.add_argument(
-            "--kv-transfer-config",
-            type=KVTransferConfig.from_cli,
-            default=None,
-            help="The configurations for distributed KV cache "
-            "transfer. Should be a JSON string.",
-        )
 
         parser.add_argument(
             "--worker-cls",
