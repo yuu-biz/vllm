@@ -5,6 +5,7 @@ import torch
 from torch import nn
 
 
+
 @dataclass
 class ControlVectorMapping:
     layer_mapping: Dict[int, torch.Tensor]
@@ -54,11 +55,10 @@ class MLPWithControlVector(BaseLayerWithControlVector):
         cv = self.active_vector
 
         if cv is not None and cv.numel() > 0:
-            cv = cv.to(hidden_states.device)
-
             hidden_states += cv
 
             if self.normalize:
+                print("HERE")
                 hidden_states = hidden_states * norm_pre / torch.norm(
                     hidden_states, dim=-1, keepdim=True)
 

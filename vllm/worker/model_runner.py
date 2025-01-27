@@ -720,15 +720,6 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             return
         inter_data.control_vector_request = (
             seq_group_metadata.control_vector_request)
-        ##load control_vector_mapping
-
-        from safetensors.torch import load_file
-        if inter_data.control_vector_request:
-            mapping = load_file(
-                inter_data.control_vector_request.control_vector_local_path)
-
-            inter_data.control_vector_mapping = ControlVectorMapping(
-                mapping['prompt_embeddings'])
 
     def _compute_multi_modal_input(self, inter_data: InterDataForSeqGroup,
                                    seq_group_metadata: SequenceGroupMetadata):
@@ -1035,10 +1026,9 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
 
         control_vector_requests: Set[ControlVectorRequest] = set()
         if self.enable_control_vector:
-            control_vector_requests = set(
-                data.control_vector_request for data in self.inter_data_list
-                if data.control_vector_request
-            )
+            control_vector_requests = set(data.control_vector_request
+                                          for data in self.inter_data_list
+                                          if data.control_vector_request)
 
         # Multi-modal data.
         multi_modal_kwargs_list = [

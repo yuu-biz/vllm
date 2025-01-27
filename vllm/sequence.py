@@ -1028,6 +1028,11 @@ class SequenceGroupMetadata(
         return (self.prompt_adapter_request.prompt_adapter_num_virtual_tokens
                 if self.prompt_adapter_request else 0)
 
+    @property
+    def control_vector_id(self) -> int:
+        return (self.control_vector_request.adapter_id
+                if self.control_vector_request else 0)
+
     # Multi-Step Chunked-Prefill property
     @property
     def is_single_step_prompt(self) -> bool:
@@ -1058,11 +1063,6 @@ class SequenceGroupMetadata(
             self.state.current_step < self.state.num_steps
         ), f"current step {self.state.current_step}, num_steps {self.state.num_steps}"  # noqa
         self.state.current_step += 1
-
-    @property
-    def control_vector_id(self) -> int:
-        return (self.control_vector_request.adapter_id
-                if self.control_vector_request else 0)
 
 
 class SequenceOutput(

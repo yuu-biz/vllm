@@ -159,7 +159,8 @@ class LRUCacheWorkerControlVectorManager(WorkerControlVectorManager):
             control_vector = self._load_adapter(control_vector_request)
             loaded = self._adapter_manager.add_adapter(control_vector)
         else:
-            loaded = self._adapter_manager.get_adapter(control_vector_request.adapter_id)
+            loaded = self._adapter_manager.get_adapter(
+                control_vector_request.adapter_id)
         self._adapter_manager.activate_adapter(
             control_vector_request.control_vector_id)
         return loaded
