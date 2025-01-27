@@ -3,20 +3,19 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type
 
 import gguf
+import numpy as np
+import torch
+from huggingface_hub import hf_hub_download
+from torch import nn
 
 from vllm.adapter_commons.models import (AdapterLRUCache, AdapterModel,
                                          AdapterModelManager)
-from torch import nn
-from huggingface_hub import hf_hub_download
-import torch
-import numpy as np
-from vllm.control_vectors.layers import (ControlVectorMapping,
-                                         MLPWithControlVector)
 from vllm.adapter_commons.utils import (add_adapter, deactivate_adapter,
                                         get_adapter, list_adapters,
                                         remove_adapter, set_adapter_mapping)
 from vllm.config import ControlVectorConfig
-
+from vllm.control_vectors.layers import (ControlVectorMapping,
+                                         MLPWithControlVector)
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +117,6 @@ class ControlVectorModel(AdapterModel):
 
         except Exception as e:
             raise e
-
 
 
 class ControlVectorModelManager(AdapterModelManager):
@@ -233,6 +231,7 @@ class ControlVectorModelManager(AdapterModelManager):
     def add_adapter(self, adapter: ControlVectorModel) -> bool:
         return add_adapter(adapter, self._registered_adapters, self.capacity,
                            self._add_adapter)
+
     def set_adapter_mapping(self, mapping: ControlVectorMapping) -> None:
         self._last_mapping = set_adapter_mapping(mapping, self._last_mapping,
                                                  self._set_adapter_mapping)
