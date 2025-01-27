@@ -2,60 +2,111 @@ import copy
 import time
 from collections import Counter as collectionsCounter
 from collections import deque
+from collections.abc import Iterable, Mapping
+from collections.abc import Sequence as GenericSequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
-from typing import (TYPE_CHECKING, Callable, ClassVar, Deque, Dict, Iterable,
-                    List, Mapping, NamedTuple, Optional)
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    ClassVar,
+    Deque,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    NamedTuple,
+    Optional,
+    Set,
+    Type,
+    Union,
+    cast,
+    overload,
+)
 from typing import Sequence as GenericSequence
-from typing import Set, Type, Union, cast, overload
 
 import torch
 from typing_extensions import TypeVar, deprecated
 
 import vllm.envs as envs
-from vllm.config import (DecodingConfig, LoRAConfig, ModelConfig,
-                         ObservabilityConfig, ParallelConfig, SchedulerConfig,
-                         VllmConfig)
-from vllm.core.scheduler import (ScheduledSequenceGroup, Scheduler,
-                                 SchedulerOutputs)
+from vllm.config import (
+    DecodingConfig,
+    LoRAConfig,
+    ModelConfig,
+    ObservabilityConfig,
+    ParallelConfig,
+    SchedulerConfig,
+    VllmConfig,
+)
+from vllm.control_vectors.request import ControlVectorRequest
+from vllm.core.scheduler import (
+    ScheduledSequenceGroup,
+    Scheduler,
+    SchedulerOutputs,
+)
 from vllm.engine.arg_utils import EngineArgs
 from vllm.engine.metrics_types import StatLoggerBase, Stats
-from vllm.engine.output_processor.interfaces import (
-    SequenceGroupOutputProcessor)
+from vllm.engine.output_processor.interfaces import SequenceGroupOutputProcessor
 from vllm.engine.output_processor.stop_checker import StopChecker
 from vllm.engine.output_processor.util import create_output_by_sequence_group
 from vllm.entrypoints.openai.logits_processors import (
-    get_logits_processors as get_openai_logits_processors)
+    get_logits_processors as get_openai_logits_processors,
+)
 from vllm.executor.executor_base import ExecutorBase
-from vllm.inputs import (INPUT_REGISTRY, InputRegistry, ProcessorInputs,
-                         PromptType, SingletonInputsAdapter)
+from vllm.inputs import (
+    INPUT_REGISTRY,
+    InputRegistry,
+    ProcessorInputs,
+    PromptType,
+    SingletonInputsAdapter,
+)
 from vllm.inputs.parse import is_encoder_decoder_inputs, is_token_prompt
 from vllm.inputs.preprocess import InputPreprocessor
 from vllm.logger import init_logger
 from vllm.logits_process import get_bad_words_logits_processors
 from vllm.lora.request import LoRARequest
 from vllm.model_executor.guided_decoding import (
-    get_local_guided_decoding_logits_processor)
+    get_local_guided_decoding_logits_processor,
+)
 from vllm.model_executor.layers.sampler import SamplerOutput
 from vllm.multimodal import MULTIMODAL_REGISTRY, MultiModalRegistry
-from vllm.outputs import (PoolingRequestOutput, RequestOutput,
-                          RequestOutputFactory)
+from vllm.outputs import (
+    PoolingRequestOutput,
+    RequestOutput,
+    RequestOutputFactory,
+)
 from vllm.pooling_params import PoolingParams
 from vllm.prompt_adapter.request import PromptAdapterRequest
 from vllm.sampling_params import RequestOutputKind, SamplingParams
-from vllm.sequence import (ExecuteModelRequest, ParallelSampleSequenceGroup,
-                           PoolingSequenceGroupOutput, Sequence, SequenceGroup,
-                           SequenceGroupBase, SequenceGroupMetadata,
-                           SequenceGroupOutput, SequenceStatus)
-from vllm.tracing import (SpanAttributes, SpanKind, extract_trace_context,
-                          init_tracer)
+from vllm.sequence import (
+    ExecuteModelRequest,
+    ParallelSampleSequenceGroup,
+    PoolingSequenceGroupOutput,
+    Sequence,
+    SequenceGroup,
+    SequenceGroupBase,
+    SequenceGroupMetadata,
+    SequenceGroupOutput,
+    SequenceStatus,
+)
+from vllm.tracing import (
+    SpanAttributes,
+    SpanKind,
+    extract_trace_context,
+    init_tracer,
+)
 from vllm.transformers_utils.detokenizer import Detokenizer
 from vllm.transformers_utils.tokenizer import AnyTokenizer
 from vllm.transformers_utils.tokenizer_group import (
-    BaseTokenizerGroup, init_tokenizer_from_configs)
-from vllm.usage.usage_lib import (UsageContext, is_usage_stats_enabled,
-                                  usage_message)
+    BaseTokenizerGroup,
+    init_tokenizer_from_configs,
+)
+from vllm.usage.usage_lib import (
+    UsageContext,
+    is_usage_stats_enabled,
+    usage_message,
+)
 from vllm.utils import Counter, Device, deprecate_kwargs, weak_bind
 from vllm.version import __version__ as VLLM_VERSION
 
@@ -226,6 +277,7 @@ class LLMEngine:
         self.decoding_config = vllm_config.decoding_config or DecodingConfig(  # noqa
         )
         self.prompt_adapter_config = vllm_config.prompt_adapter_config  # noqa
+        self.control_vector_config = vllm_config.control_vector_config
         self.observability_config = vllm_config.observability_config or ObservabilityConfig(  # noqa
         )
 
@@ -276,7 +328,8 @@ class LLMEngine:
         # If usage stat is enabled, collect relevant info.
         if is_usage_stats_enabled():
             from vllm.model_executor.model_loader import (
-                get_architecture_class_name)
+                get_architecture_class_name,
+            )
             usage_message.report_usage(
                 get_architecture_class_name(self.model_config),
                 usage_context,
@@ -362,8 +415,10 @@ class LLMEngine:
                 # We need to set PROMETHEUS_MULTIPROC_DIR environment variable
                 # before prometheus_client is imported.
                 # See https://prometheus.github.io/client_python/multiprocess/
-                from vllm.engine.metrics import (LoggingStatLogger,
-                                                 PrometheusStatLogger)
+                from vllm.engine.metrics import (
+                    LoggingStatLogger,
+                    PrometheusStatLogger,
+                )
 
                 self.stat_loggers = {
                     "logging":
@@ -444,11 +499,13 @@ class LLMEngine:
         elif engine_config.parallel_config.world_size > 1:
             if distributed_executor_backend == "ray":
                 from vllm.executor.ray_distributed_executor import (
-                    RayDistributedExecutor)
+                    RayDistributedExecutor,
+                )
                 executor_class = RayDistributedExecutor
             elif distributed_executor_backend == "mp":
                 from vllm.executor.mp_distributed_executor import (
-                    MultiprocessingDistributedExecutor)
+                    MultiprocessingDistributedExecutor,
+                )
                 assert not envs.VLLM_USE_RAY_SPMD_WORKER, (
                     "multiprocessing distributed executor backend does not "
                     "support VLLM_USE_RAY_SPMD_WORKER=1")
@@ -548,6 +605,7 @@ class LLMEngine:
         arrival_time: float,
         lora_request: Optional[LoRARequest],
         prompt_adapter_request: Optional[PromptAdapterRequest],
+        control_vector_request: Optional[ControlVectorRequest],
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
     ) -> Optional[SequenceGroup]:
@@ -598,6 +656,7 @@ class LLMEngine:
                 lora_request=lora_request,
                 trace_headers=trace_headers,
                 prompt_adapter_request=prompt_adapter_request,
+                control_vector_request=control_vector_request,
                 encoder_seq=encoder_seq,
                 priority=priority)
         elif isinstance(params, PoolingParams):
@@ -608,6 +667,7 @@ class LLMEngine:
                 arrival_time=arrival_time,
                 lora_request=lora_request,
                 prompt_adapter_request=prompt_adapter_request,
+                control_vector_request=control_vector_request,
                 encoder_seq=encoder_seq,
                 priority=priority)
         else:
@@ -637,6 +697,7 @@ class LLMEngine:
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> None:
         ...
@@ -653,6 +714,7 @@ class LLMEngine:
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> None:
         ...
@@ -670,6 +732,7 @@ class LLMEngine:
             lora_request: Optional[LoRARequest] = None,
             trace_headers: Optional[Mapping[str, str]] = None,
             prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+            control_vector_request: Optional[ControlVectorRequest] = None,
             priority: int = 0,
             *,
             inputs: Optional[PromptType] = None,  # DEPRECATED
@@ -761,6 +824,7 @@ class LLMEngine:
             arrival_time=arrival_time,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
+            control_vector_request=control_vector_request,
             trace_headers=trace_headers,
             priority=priority,
         )
@@ -795,6 +859,7 @@ class LLMEngine:
         lora_request: Optional[LoRARequest],
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         encoder_seq: Optional[Sequence] = None,
         priority: int = 0,
     ) -> SequenceGroup:
@@ -826,6 +891,7 @@ class LLMEngine:
             lora_request=lora_request,
             trace_headers=trace_headers,
             prompt_adapter_request=prompt_adapter_request,
+            control_vector_request=control_vector_request,
             encoder_seq=encoder_seq,
             priority=priority)
 
@@ -839,6 +905,7 @@ class LLMEngine:
         arrival_time: float,
         lora_request: Optional[LoRARequest],
         prompt_adapter_request: Optional[PromptAdapterRequest],
+        control_vector_request: Optional[ControlVectorRequest],
         encoder_seq: Optional[Sequence] = None,
         priority: int = 0,
     ) -> SequenceGroup:
@@ -853,6 +920,7 @@ class LLMEngine:
             lora_request=lora_request,
             pooling_params=pooling_params,
             prompt_adapter_request=prompt_adapter_request,
+            control_vector_request=control_vector_request,
             encoder_seq=encoder_seq,
             priority=priority)
         return seq_group

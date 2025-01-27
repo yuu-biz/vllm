@@ -1,12 +1,22 @@
 import asyncio
 from abc import ABC, abstractmethod
-from typing import (Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple,
-                    Union)
+from typing import (
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 import torch.nn as nn
 from typing_extensions import TypeVar
 
 from vllm.config import VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.logger import init_logger
 from vllm.lora.request import LoRARequest
 from vllm.model_executor.layers.sampler import SamplerOutput
@@ -46,6 +56,7 @@ class ExecutorBase(ABC):
         self.speculative_config = vllm_config.speculative_config
         self.prompt_adapter_config = vllm_config.prompt_adapter_config
         self.observability_config = vllm_config.observability_config
+        self.control_vector_config = vllm_config.control_vector_config
         self._init_executor()
         self.is_sleeping = False
 
@@ -218,6 +229,15 @@ class ExecutorBase(ABC):
                             kwargs=dict(path=path,
                                         pattern=pattern,
                                         max_size=max_size))
+
+    @abstractmethod
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_control_vector(self, cv_id: int) -> bool:
+        raise NotImplementedError
 
     @abstractmethod
     def check_health(self) -> None:
