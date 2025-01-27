@@ -110,10 +110,9 @@ class ControlVectorModelManager(AdapterModelManager):
         index, _ = first_free_slot
         self._active_adapters[control_vector_id] = None
         control_vector_model = (self._registered_adapters[control_vector_id])
-        # logger.debug("Activating control vector. int id: %d, slot index: %d",
-        #              control_vector_model.id, index)
+        logger.debug("Activating control vector. int id: %d, slot index: %d",
+                     control_vector_model.id, index)
         self.control_vector_index_to_id[index] = control_vector_model.id
-        # print("MODULES", self.modules.items())
         for k, v in self.modules.items():
             index = parse_number_from_string(k)
             if index < len(control_vector_model.control_vector_weights):
@@ -145,7 +144,11 @@ class ControlVectorModelManager(AdapterModelManager):
 
         for k, v in self.modules.items():
             v.set_active_tensor(index)
-
+    
+    def remove_adapter(self, adapter_id: int)-> bool:
+        if adapter_id in self._registered_adapters:
+            del self._registered_adapters[adapter_id]
+    
     def _create_cv_modules(self):
         for module_name, module in self.model.named_modules():
             for key in _all_cv_classes:
@@ -182,7 +185,6 @@ class ControlVectorModelManager(AdapterModelManager):
     def add_adapter(self, adapter: ControlVectorModel) -> bool:
         return add_adapter(adapter, self._registered_adapters, self.capacity,
                            self._add_adapter)
-
     def set_adapter_mapping(self, mapping: ControlVectorMapping) -> None:
         self._last_mapping = set_adapter_mapping(mapping, self._last_mapping,
                                                  self._set_adapter_mapping)
