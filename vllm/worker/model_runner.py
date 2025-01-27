@@ -1212,6 +1212,15 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
                 self.prompt_adapter_manager.create_prompt_adapter_manager(
                     self.model))
 
+        if self.control_vector_config:
+            self.control_vector_manager = LRUCacheWorkerControlVectorManager(
+                self.device,
+                self.control_vector_config
+                )
+            self.model = (
+                self.control_vector_manager.create_control_vector_manager(
+                    self.model))
+
         if self.vllm_config.compilation_config.level ==\
             CompilationLevel.DYNAMO_AS_IS and supports_dynamo():
             backend = self.vllm_config.compilation_config.init_backend(
