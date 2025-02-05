@@ -1,19 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
 """Sequence and its related classes."""
+
 import copy
 import enum
 from abc import ABC, abstractmethod
 from array import array
 from collections import defaultdict
+from collections.abc import Mapping
+from collections.abc import Sequence as GenericSequence
 from dataclasses import dataclass, field
 from functools import reduce
-from typing import Any, Callable, DefaultDict, Dict, List, Mapping, Optional
-from typing import Sequence as GenericSequence
-from typing import Set, Tuple, Union
+from typing import (Any, Callable, DefaultDict, Dict, List, Optional, Set,
+                    Tuple, Union)
 
 import msgspec
 import torch
 
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.inputs import SingletonInputs, SingletonInputsAdapter
 from vllm.lora.request import LoRARequest
 from vllm.multimodal import MultiModalDataDict, MultiModalPlaceholderDict
@@ -43,6 +46,7 @@ class Logprob:
         rank: The vocab rank of chosen token (>=1)
         decoded_token: The decoded chosen token index
     """
+
     logprob: float
     rank: Optional[int] = None
     decoded_token: Optional[str] = None
@@ -57,6 +61,7 @@ SampleLogprobs = List[Dict[int, Logprob]]
 
 class SequenceStatus(enum.IntEnum):
     """Status of a sequence."""
+
     WAITING = 0
     RUNNING = 1
     SWAPPED = 2
@@ -112,6 +117,7 @@ class RequestMetrics:
                             will include model forward, block/sync across
                             workers, cpu-gpu sync time and sampling time.
     """
+
     arrival_time: float
     last_token_time: float
     first_scheduled_time: Optional[float]
@@ -126,8 +132,10 @@ class RequestMetrics:
 class SequenceDataDelta(
         msgspec.Struct,
         array_like=True,  # type: ignore[call-arg]
-        omit_defaults=True):  # type: ignore[call-arg]
+        omit_defaults=True,
+):  # type: ignore[call-arg]
     """Delta SequenceData to send to workers per step."""
+
     # A new token to be appended to existing SequenceData.
     new_output_token_ids: List[int]
     # Overwriting existing `cumulative_logprob`
@@ -152,6 +160,7 @@ class SequenceData(msgspec.Struct,
         output_token_ids: The token IDs of the output.
         cumulative_logprob: The cumulative log probability of the output.
     """
+
     # NOTE: we cannot use Union[List, array] because msgspec cannot support
     # union of 2 list types.
     _prompt_token_ids: array
@@ -178,7 +187,7 @@ class SequenceData(msgspec.Struct,
 
     @staticmethod
     def from_prompt_token_counts(
-            *token_counts: Tuple[int, int]) -> "SequenceData":
+        *token_counts: Tuple[int, int], ) -> "SequenceData":
         """
         Construct a :class:`SequenceData` instance by concatenating
         prompt token sequences.
@@ -304,8 +313,10 @@ class SequenceData(msgspec.Struct,
         """Get prefix tokens, and make the return value hashable"""
         prompt_length = self.get_prompt_len()
         if num_tokens > prompt_length:
-            return (self._prompt_token_ids_tuple,
-                    tuple(self._output_token_ids[:num_tokens - prompt_length]))
+            return (
+                self._prompt_token_ids_tuple,
+                tuple(self._output_token_ids[:num_tokens - prompt_length]),
+            )
         else:
             return (self._prompt_token_ids_tuple[:num_tokens], None)
 
@@ -317,7 +328,9 @@ class SequenceData(msgspec.Struct,
         """Update number of tokens computed so far."""
         self._num_computed_tokens += num_new_computed_tokens
         assert self._num_computed_tokens <= self.get_len(), (
-            self._num_computed_tokens, self.get_len())
+            self._num_computed_tokens,
+            self.get_len(),
+        )
         # If all tokens are computed, it means it is in decoding phase.
         if self.get_num_uncomputed_tokens() == 0:
             self._stage = SequenceStage.DECODE
@@ -358,9 +371,12 @@ class SequenceData(msgspec.Struct,
         return self.output_token_ids
 
     def get_delta_and_reset(self) -> SequenceDataDelta:
-        delta = SequenceDataDelta(self._new_appended_tokens,
-                                  self._cumulative_logprob,
-                                  self.get_num_computed_tokens(), self.stage)
+        delta = SequenceDataDelta(
+            self._new_appended_tokens,
+            self._cumulative_logprob,
+            self.get_num_computed_tokens(),
+            self.stage,
+        )
         # Reset delta state.
         self._new_appended_tokens = []
         return delta
@@ -472,8 +488,8 @@ class Sequence:
 
     @property
     def prompt_adapter_id(self) -> int:
-        return self.prompt_adapter_request.prompt_adapter_id \
-                        if self.prompt_adapter_request else 0
+        return (self.prompt_adapter_request.prompt_adapter_id
+                if self.prompt_adapter_request else 0)
 
     def get_output_text_to_return(self, buffer_length: int,
                                   delta: bool) -> str:
@@ -483,8 +499,8 @@ class Sequence:
         # We return the full output text if the sequence is finished.
         truncate = buffer_length and not self.is_finished()
         if not delta:
-            return self.output_text[:-buffer_length] if truncate else (
-                self.output_text)
+            return (self.output_text[:-buffer_length] if truncate else
+                    (self.output_text))
         length = len(self.output_text)
         if truncate:
             length -= buffer_length
@@ -653,6 +669,7 @@ class SequenceGroup:
         encoder_seq: Optional[Sequence] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> None:
         self.request_id = request_id
@@ -675,6 +692,7 @@ class SequenceGroup:
         self.pooling_params = pooling_params
         self.pooled_data = pooled_data
         self.prompt_adapter_request = prompt_adapter_request
+        self.control_vector_request = control_vector_request
         self.encoder_seq = encoder_seq
         self.trace_headers = trace_headers
         self.priority = priority
@@ -694,8 +712,7 @@ class SequenceGroup:
         # There are either 0 or 1 encoder sequences
         # If one is present, its prompt is distinct
         # from the decoder's.
-        return (self.encoder_seq.prompt
-                if self.encoder_seq is not None else None)
+        return self.encoder_seq.prompt if self.encoder_seq is not None else None
 
     @property
     def encoder_prompt_token_ids(self) -> Optional[List[int]]:
@@ -739,23 +756,25 @@ class SequenceGroup:
 
     @property
     def prompt_adapter_id(self) -> int:
-        return self.prompt_adapter_request.prompt_adapter_id \
-                        if self.prompt_adapter_request else 0
+        return (self.prompt_adapter_request.prompt_adapter_id
+                if self.prompt_adapter_request else 0)
 
     @property
     def prompt_adapter_num_virtual_tokens(self) -> int:
-        return self.prompt_adapter_request.prompt_adapter_num_virtual_tokens\
-                         if self.prompt_adapter_request else 0
+        return (self.prompt_adapter_request.prompt_adapter_num_virtual_tokens
+                if self.prompt_adapter_request else 0)
 
     def init_multi_step(self, num_steps: int) -> None:
         self.state.num_steps = num_steps
         self.state.current_step = 0
 
-    def init_multi_step_from_lookahead_slots(self, num_lookahead_slots: int,
-                                             num_scheduler_steps: int,
-                                             is_multi_step: bool,
-                                             enable_chunking: bool) -> None:
-
+    def init_multi_step_from_lookahead_slots(
+        self,
+        num_lookahead_slots: int,
+        num_scheduler_steps: int,
+        is_multi_step: bool,
+        enable_chunking: bool,
+    ) -> None:
         if not is_multi_step:
             self.init_multi_step(num_steps=num_scheduler_steps)
             return
@@ -891,12 +910,14 @@ class SequenceGroupMetadataDelta(
         msgspec.Struct,
         tag=True,  # type: ignore[call-arg]
         array_like=True,  # type: ignore[call-arg]
-        omit_defaults=True):  # type: ignore[call-arg]
+        omit_defaults=True,
+):  # type: ignore[call-arg]
     """Delta of SequenceGroupMetadata.
 
     After sending the first SequenceGroupMetadata, vLLM scheduler
     only sends delta to reduce the data payload size.
     """
+
     seq_data_delta: Dict[int, SequenceDataDelta]
     request_id: str
     block_tables: Dict[int, List[int]]
@@ -912,7 +933,8 @@ class SequenceGroupMetadata(
         msgspec.Struct,
         tag=True,  # type: ignore[call-arg]
         array_like=True,  # type: ignore[call-arg]
-        omit_defaults=True):  # type: ignore[call-arg]
+        omit_defaults=True,
+):  # type: ignore[call-arg]
     """Metadata for a sequence group. Used to create `AttentionMetadata`.
 
     Args:
@@ -943,6 +965,7 @@ class SequenceGroupMetadata(
                            unless you are working with an encoder/decoder
                            model.
         prompt_adapter_request: Prompt Adapter request.
+        control_vector_request: Contorol Vector request.
     """
 
     request_id: str
@@ -965,6 +988,7 @@ class SequenceGroupMetadata(
     encoder_seq_data: Optional[SequenceData] = None
     cross_block_table: Optional[List[int]] = None
     prompt_adapter_request: Optional[PromptAdapterRequest] = None
+    control_vector_request: Optional[ControlVectorRequest] = None
     token_chunk_size: Optional[int] = None
 
     ### Stateful fields that are lazily defined. ###
@@ -988,13 +1012,18 @@ class SequenceGroupMetadata(
 
     @property
     def prompt_adapter_id(self) -> int:
-        return self.prompt_adapter_request.prompt_adapter_id \
-                        if self.prompt_adapter_request else 0
+        return (self.prompt_adapter_request.prompt_adapter_id
+                if self.prompt_adapter_request else 0)
 
     @property
     def prompt_adapter_num_virtual_tokens(self) -> int:
-        return self.prompt_adapter_request.prompt_adapter_num_virtual_tokens \
-                        if self.prompt_adapter_request else 0
+        return (self.prompt_adapter_request.prompt_adapter_num_virtual_tokens
+                if self.prompt_adapter_request else 0)
+
+    @property
+    def control_vector_id(self) -> int:
+        return self.control_vector_request.adapter_id \
+            if self.control_vector_request else 0
 
     # Multi-Step Chunked-Prefill property
     @property
@@ -1022,15 +1051,17 @@ class SequenceGroupMetadata(
 
     def finish_step(self) -> None:
         assert self.state is not None
-        assert self.state.current_step < self.state.num_steps, \
-            f"current step {self.state.current_step}, num_steps {self.state.num_steps}" # noqa
+        assert (
+            self.state.current_step < self.state.num_steps
+        ), f"current step {self.state.current_step}, num_steps {self.state.num_steps}"  # noqa
         self.state.current_step += 1
 
 
 class SequenceOutput(
         msgspec.Struct,
         omit_defaults=True,  # type: ignore[call-arg]
-        array_like=True):  # type: ignore[call-arg]
+        array_like=True,
+):  # type: ignore[call-arg]
     """The model output associated with a sequence.
 
     Args:
@@ -1040,6 +1071,7 @@ class SequenceOutput(
         logprobs: The logprobs of the output token.
             (Token id -> logP(x_i+1 | x_0, ..., x_i))
     """
+
     parent_seq_id: int
     output_token: int
     logprobs: Dict[int, Logprob]
@@ -1164,12 +1196,12 @@ class PoolerOutput(
         return len(self.outputs)
 
     def __eq__(self, other: object):
-        return isinstance(other,
-                          self.__class__) and self.outputs == other.outputs
+        return (isinstance(other, self.__class__)
+                and self.outputs == other.outputs)
 
 
 def get_all_seq_ids(
-        seq_group_metadata_list: List[SequenceGroupMetadata]) -> List[int]:
+    seq_group_metadata_list: List[SequenceGroupMetadata], ) -> List[int]:
     """Given a list of SequenceGroupMetadata, create a list of all
     sequence ids.
     """
@@ -1177,7 +1209,7 @@ def get_all_seq_ids(
 
 
 def get_all_seq_ids_and_request_ids(
-    seq_group_metadata_list: List[SequenceGroupMetadata]
+    seq_group_metadata_list: List[SequenceGroupMetadata],
 ) -> Tuple[List[int], Dict[str, Set[int]]]:
     """Given a list of SequenceGroupMetadata, create a list of all
     sequence ids.
@@ -1199,6 +1231,7 @@ class HiddenStates(msgspec.Struct, array_like=True,
 
     seq_ids are the sequence ids of each entry of the batch
     dimension of the hidden_states tensor"""
+
     # Scorer hidden states. For prefill step, it is used for hidden states of
     # all tokens, whereas for decode step, it use used for last accepted tokens.
     hidden_states: torch.Tensor
@@ -1221,10 +1254,12 @@ class HiddenStates(msgspec.Struct, array_like=True,
     def seq_ids(self) -> List[int]:
         return self._seq_ids
 
-    def update(self,
-               hidden_states: torch.Tensor,
-               seq_group_metadata_list: List[SequenceGroupMetadata],
-               second_last_token_hidden_states: Optional[torch.Tensor] = None):
+    def update(
+        self,
+        hidden_states: torch.Tensor,
+        seq_group_metadata_list: List[SequenceGroupMetadata],
+        second_last_token_hidden_states: Optional[torch.Tensor] = None,
+    ):
         """Update hidden states from target model invocation. Only used for
         decode steps"""
         assert len(seq_group_metadata_list) == len(hidden_states)
@@ -1237,13 +1272,12 @@ class HiddenStates(msgspec.Struct, array_like=True,
                 self.second_last_token_hidden_states,
                 torch.zeros_like(hidden_states)
                 if second_last_token_hidden_states is None else
-                second_last_token_hidden_states
+                second_last_token_hidden_states,
             ])
 
     def prune(self,
               seq_group_metadata_list: List[SequenceGroupMetadata]) -> None:
-        """Prune to provided list of sequence ids. Only used for decode steps.
-        """
+        """Prune to provided list of sequence ids. Only used for decode steps."""  # noqa: E501
         # Currently this prunes all seq_ids not present in
         # seq_group_metadata_list which might cause problems where a sequence
         # may be "paused" then "resumed" later. This should only prune sequences
@@ -1254,16 +1288,16 @@ class HiddenStates(msgspec.Struct, array_like=True,
             index = [self._seq_ids.index(seq_id) for seq_id in seq_ids]
             self.hidden_states = self.hidden_states[index]
             if self.second_last_token_hidden_states is not None:
-                self.second_last_token_hidden_states = self\
-                    .second_last_token_hidden_states[index]
+                self.second_last_token_hidden_states = (
+                    self.second_last_token_hidden_states[index])
             self._seq_ids = seq_ids
 
     def expand_with_bonus_tokens(
             self, seq_with_bonus_token_in_last_step: set) -> None:
         """Expand hidden states for sequences with bonus tokens. This is in
         alignment with `MultiStepWorker._expand_execute_model_request`."""
-        if self.second_last_token_hidden_states is None \
-            or not seq_with_bonus_token_in_last_step:
+        if (self.second_last_token_hidden_states is None
+                or not seq_with_bonus_token_in_last_step):
             return
 
         index = []
@@ -1280,9 +1314,11 @@ class HiddenStates(msgspec.Struct, array_like=True,
 class ExecuteModelRequest(
         msgspec.Struct,
         array_like=True,  # type: ignore[call-arg]
-        omit_defaults=True):  # type: ignore[call-arg]
+        omit_defaults=True,
+):  # type: ignore[call-arg]
     """The model execution request, containing CPU metadata only. The LLM
     engine should create an instance of this class for each request batch."""
+
     # The sequence group metadata list.
     seq_group_metadata_list: List[Union[SequenceGroupMetadata,
                                         SequenceGroupMetadataDelta]]
@@ -1339,8 +1375,9 @@ class ExecuteModelRequest(
         return state.current_step
 
     def clone(
-        self, seq_group_metadata_list: List[Union[SequenceGroupMetadata,
-                                                  SequenceGroupMetadataDelta]]
+        self,
+        seq_group_metadata_list: List[Union[SequenceGroupMetadata,
+                                            SequenceGroupMetadataDelta]],
     ) -> "ExecuteModelRequest":
         """Clone the request with a new sequence group metadata list."""
         return ExecuteModelRequest(
@@ -1356,7 +1393,8 @@ class ExecuteModelRequest(
             finished_requests_ids=self.finished_requests_ids,
             last_sampled_token_ids=self.last_sampled_token_ids.clone()
             if self.last_sampled_token_ids is not None else None,
-            async_callback=self.async_callback)
+            async_callback=self.async_callback,
+        )
 
 
 @dataclass
@@ -1386,8 +1424,7 @@ class SequenceGroupBase:
         raise NotImplementedError
 
     def finish_seq(self, seq: SequenceGroup):
-        """The sequence `seq` finishes, we should record the information.
-        """
+        """The sequence `seq` finishes, we should record the information."""
         del self.to_be_finished[seq.request_id]
         self.finished_reqs[seq.request_id] = seq
 
@@ -1437,6 +1474,7 @@ class ParallelSampleSequenceGroup(SequenceGroupBase):
             encoder_seq=seq_group.encoder_seq,
             trace_headers=seq_group.trace_headers,
             prompt_adapter_request=seq_group.prompt_adapter_request,
+            control_vector_request=seq_group.control_vector_request,
             priority=seq_group.priority,
         )
 
@@ -1445,7 +1483,6 @@ class ParallelSampleSequenceGroup(SequenceGroupBase):
 
     def maybe_assemble_group(
             self, seq_group: SequenceGroup) -> Optional[SequenceGroup]:
-
         # in the streaming mode, we will return the assembled sequence
         # for the first remaining sequence, and then return None for the
         # rest of sequences
