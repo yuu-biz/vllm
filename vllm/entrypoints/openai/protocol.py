@@ -1426,3 +1426,14 @@ class LoadLoraAdapterRequest(BaseModel):
 class UnloadLoraAdapterRequest(BaseModel):
     lora_name: str
     lora_int_id: Optional[int] = Field(default=None)
+
+
+class LoadControlVectorRequest(BaseModel):
+    cv_name: str
+    cv_path: str
+    cv_scale: float
+
+
+class UnloadControlVectorRequest(BaseModel):
+    cv_name: str
+    cv_int_id: Optional[int] = Field(default=None)

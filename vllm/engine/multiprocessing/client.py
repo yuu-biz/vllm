@@ -17,6 +17,7 @@ from zmq.asyncio import Socket
 
 from vllm import PoolingParams
 from vllm.config import DecodingConfig, ModelConfig, VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.core.scheduler import SchedulerOutputs
 from vllm.engine.arg_utils import AsyncEngineArgs
 # yapf conflicts with isort for this block
@@ -27,8 +28,10 @@ from vllm.engine.multiprocessing import (ENGINE_DEAD_ERROR, IPC_DATA_EXT,
                                          IPC_HEALTH_EXT, IPC_INPUT_EXT,
                                          IPC_OUTPUT_EXT, RPC_REQUEST_T,
                                          VLLM_RPC_SUCCESS_STR, RPCAbortRequest,
-                                         RPCAdapterLoadedResponse, RPCError,
-                                         RPCLoadAdapterRequest,
+                                         RPCAdapterLoadedResponse,
+                                         RPCControlVectorLoadedResponse,
+                                         RPCError, RPCLoadAdapterRequest,
+                                         RPCLoadControlVectorRequest,
                                          RPCProcessRequest,
                                          RPCResetPrefixCacheRequest,
                                          RPCStartupRequest, RPCStartupResponse,
@@ -246,7 +249,9 @@ class MQLLMEngineClient(EngineClient):
                         if queue is not None:
                             queue.put_nowait(exception)
                 # Put each output into the appropriate queue.
-                elif isinstance(request_outputs, RPCAdapterLoadedResponse):
+                elif isinstance(request_outputs,
+                                (RPCAdapterLoadedResponse,
+                                 RPCControlVectorLoadedResponse)):
                     self._add_output(request_outputs)
                 else:
                     for request_output in request_outputs:
@@ -255,8 +260,10 @@ class MQLLMEngineClient(EngineClient):
         except asyncio.CancelledError:
             logger.debug("Shutting down MQLLMEngineClient output handler.")
 
-    def _add_output(self, request_output: Union[RequestOutput,
-                                                RPCAdapterLoadedResponse]):
+    def _add_output(self,
+                    request_output: Union[RequestOutput,
+                                          RPCAdapterLoadedResponse,
+                                          RPCControlVectorLoadedResponse]):
         queue = self.output_queues.get(request_output.request_id)
         if queue is not None:
             queue.put_nowait(request_output)
@@ -441,6 +448,7 @@ class MQLLMEngineClient(EngineClient):
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> AsyncGenerator[RequestOutput, None]:
         ...
@@ -456,6 +464,7 @@ class MQLLMEngineClient(EngineClient):
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> AsyncGenerator[RequestOutput, None]:
         ...
@@ -472,6 +481,7 @@ class MQLLMEngineClient(EngineClient):
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
         *,
         inputs: Optional[PromptType] = None  # DEPRECATED
@@ -502,7 +512,8 @@ class MQLLMEngineClient(EngineClient):
 
         return self._process_request(prompt, sampling_params, request_id,
                                      lora_request, trace_headers,
-                                     prompt_adapter_request, priority)
+                                     prompt_adapter_request,
+                                     control_vector_request, priority)
 
     @overload
     def encode(
@@ -585,6 +596,7 @@ class MQLLMEngineClient(EngineClient):
         lora_request: Optional[LoRARequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> Union[AsyncGenerator[RequestOutput, None], AsyncGenerator[
             PoolingRequestOutput, None]]:
@@ -638,6 +650,7 @@ class MQLLMEngineClient(EngineClient):
                     lora_request=lora_request,
                     trace_headers=trace_headers,
                     prompt_adapter_request=prompt_adapter_request,
+                    control_vector_request=control_vector_request,
                     priority=priority,
                 ))
 
@@ -689,6 +702,28 @@ class MQLLMEngineClient(EngineClient):
         """Load a new LoRA adapter into the engine for future requests."""
         # Uses the same I/O as generate requests
         request = RPCLoadAdapterRequest(lora_request)
+
+        # Create output queue for this requests.
+        queue: asyncio.Queue[Union[None, BaseException]] = asyncio.Queue()
+        self.output_queues[request.request_id] = queue
+
+        # Send the request
+        request_bytes = pickle.dumps(request)
+        await self.input_socket.send_multipart((request_bytes, ), copy=False)
+
+        # Wait for the response
+        request_output = await queue.get()
+        self.output_queues.pop(request.request_id)
+
+        # Raise on error, otherwise happily return None
+        if isinstance(request_output, BaseException):
+            raise request_output
+
+    async def add_control_vector(self,
+                                 cv_request: ControlVectorRequest) -> None:
+        """Load a new LoRA adapter into the engine for future requests."""
+        # Uses the same I/O as generate requests
+        request = RPCLoadControlVectorRequest(cv_request)
 
         # Create output queue for this requests.
         queue: asyncio.Queue[Union[None, BaseException]] = asyncio.Queue()

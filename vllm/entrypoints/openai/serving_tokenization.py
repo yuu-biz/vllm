@@ -59,6 +59,7 @@ class OpenAIServingTokenization(OpenAIServing):
             (
                 lora_request,
                 prompt_adapter_request,
+                control_vector_request,
             ) = self._maybe_get_adapters(request)
 
             tokenizer = await self.engine_client.get_tokenizer(lora_request)
@@ -98,7 +99,8 @@ class OpenAIServingTokenization(OpenAIServing):
                              request_prompts[i],
                              params=None,
                              lora_request=lora_request,
-                             prompt_adapter_request=prompt_adapter_request)
+                             prompt_adapter_request=prompt_adapter_request,
+                             control_vector_request=control_vector_request)
 
             # Silently ignore prompt adapter since it does not affect
             # tokenization (Unlike in Embeddings API where an error is raised)
@@ -123,6 +125,7 @@ class OpenAIServingTokenization(OpenAIServing):
         (
             lora_request,
             prompt_adapter_request,
+            control_vector_request,
         ) = self._maybe_get_adapters(request)
 
         tokenizer = await self.engine_client.get_tokenizer(lora_request)
@@ -131,7 +134,8 @@ class OpenAIServingTokenization(OpenAIServing):
                          request.tokens,
                          params=None,
                          lora_request=lora_request,
-                         prompt_adapter_request=prompt_adapter_request)
+                         prompt_adapter_request=prompt_adapter_request,
+                         control_vector_request=control_vector_request)
 
         # Silently ignore prompt adapter since it does not affect tokenization
         # (Unlike in Embeddings API where an error is raised)

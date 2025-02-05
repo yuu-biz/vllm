@@ -9,10 +9,8 @@ from collections.abc import Sequence as GenericSequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
-from typing import (TYPE_CHECKING, Callable, ClassVar, Deque, Dict, Iterable,
-                    List, Mapping, NamedTuple, Optional)
-from typing import Sequence as GenericSequence
-from typing import Set, Type, Union, cast, overload
+from typing import (TYPE_CHECKING, Callable, ClassVar, Deque, Dict, List,
+                    NamedTuple, Optional, Set, Type, Union, cast, overload)
 
 import torch
 from typing_extensions import TypeVar, deprecated
@@ -1852,6 +1850,12 @@ class LLMEngine:
 
     def list_prompt_adapters(self) -> List[int]:
         return self.model_executor.list_prompt_adapters()
+
+    def add_control_vector(self, cv_request: ControlVectorRequest) -> bool:
+        return self.model_executor.add_control_vector(cv_request)
+
+    def remove_control_vector(self, cv_id: int) -> bool:
+        return self.model_executor.remove_control_vector(cv_id)
 
     def start_profile(self) -> None:
         self.model_executor.start_profile()
