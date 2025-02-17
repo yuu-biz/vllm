@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+
 import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Type
