@@ -5,10 +5,10 @@ import os
 import random
 import time
 from collections import deque
+from collections.abc import Iterable
+from collections.abc import Sequence as GenericSequence
 from dataclasses import dataclass, field
-from typing import Callable, Deque, Dict, Iterable, List, Optional
-from typing import Sequence as GenericSequence
-from typing import Set, Tuple, Union
+from typing import Callable, Deque, Dict, List, Optional, Set, Tuple, Union
 
 from vllm.config import CacheConfig, LoRAConfig, SchedulerConfig
 from vllm.core.interfaces import AllocStatus, BlockSpaceManager
@@ -302,23 +302,27 @@ class SchedulerPrefillOutputs:
 
 
 def seq_group_metadata_builder():
-    return SequenceGroupMetadata(request_id="",
-                                 is_prompt=False,
-                                 seq_data={},
-                                 sampling_params=None,
-                                 block_tables={})
+    return SequenceGroupMetadata(
+        request_id="",
+        is_prompt=False,
+        seq_data={},
+        sampling_params=None,
+        block_tables={},
+    )
 
 
 def scheduler_running_outputs_builder():
-    return SchedulerRunningOutputs(decode_seq_groups=[],
-                                   prefill_seq_groups=[],
-                                   preempted=[],
-                                   swapped_out=[],
-                                   blocks_to_swap_out=[],
-                                   blocks_to_copy=[],
-                                   num_lookahead_slots=0,
-                                   prefill_seq_groups_list=[],
-                                   decode_seq_groups_list=[])
+    return SchedulerRunningOutputs(
+        decode_seq_groups=[],
+        prefill_seq_groups=[],
+        preempted=[],
+        swapped_out=[],
+        blocks_to_swap_out=[],
+        blocks_to_copy=[],
+        num_lookahead_slots=0,
+        prefill_seq_groups_list=[],
+        decode_seq_groups_list=[],
+    )
 
 
 def scheduled_seq_group_builder():
@@ -677,8 +681,8 @@ class Scheduler:
         blocks_to_copy: List[Tuple[int, int]] = ret.blocks_to_copy
 
         decode_seq_groups: List[ScheduledSequenceGroup] = ret.decode_seq_groups
-        prefill_seq_groups: List[
-            ScheduledSequenceGroup] = ret.prefill_seq_groups
+        prefill_seq_groups: List[ScheduledSequenceGroup] = (
+            ret.prefill_seq_groups)
         preempted: List[SequenceGroup] = ret.preempted
         swapped_out: List[SequenceGroup] = ret.swapped_out
 
@@ -845,7 +849,8 @@ class Scheduler:
             is_prefill = seq_group.is_prefill()
             alloc_status = self.block_manager.can_swap_in(
                 seq_group,
-                self._get_num_lookahead_slots(is_prefill, enable_chunking))
+                self._get_num_lookahead_slots(is_prefill, enable_chunking),
+            )
             if alloc_status == AllocStatus.LATER:
                 break
             elif alloc_status == AllocStatus.NEVER:
@@ -1233,8 +1238,8 @@ class Scheduler:
                                                curr_loras,
                                                enable_chunking=False)
 
-        if len(prefills.seq_groups
-               ) == 0 and self.scheduler_config.policy == "priority":
+        if (len(prefills.seq_groups) == 0
+                and self.scheduler_config.policy == "priority"):
             self._schedule_priority_preemption(budget)
 
         # Don't schedule decodes if prefills are scheduled.
@@ -1347,8 +1352,8 @@ class Scheduler:
 
         # Schedule swapped out requests.
         # If preemption happens, it means we don't have space for swap-in.
-        if len(running_scheduled.preempted) + len(
-                running_scheduled.swapped_out) == 0:
+        if (len(running_scheduled.preempted) +
+                len(running_scheduled.swapped_out) == 0):
             swapped_in = self._schedule_swapped(budget, curr_loras)
 
         prefills = self._schedule_prefills(
@@ -1476,8 +1481,7 @@ class Scheduler:
         return no_single_seq
 
     def schedule(
-            self
-    ) -> Tuple[List[SequenceGroupMetadata], SchedulerOutputs, bool]:
+        self, ) -> Tuple[List[SequenceGroupMetadata], SchedulerOutputs, bool]:
         # Schedule sequence groups.
         # This function call changes the internal states of the scheduler
         # such as self.running, self.swapped, and self.waiting.
@@ -1583,6 +1587,7 @@ class Scheduler:
                         if scheduler_outputs.num_prefill_groups > 0 else None),
                     mm_processor_kwargs=seq_group.mm_processor_kwargs,
                     prompt_adapter_request=seq_group.prompt_adapter_request,
+                    control_vector_request=seq_group.control_vector_request,
                 )
             else:
                 # When SPMD mode is enabled, we only send delta data except for
@@ -1612,7 +1617,8 @@ class Scheduler:
         for scheduled_seq_group in scheduler_outputs.scheduled_seq_groups:
             self.block_manager.mark_blocks_as_computed(
                 scheduled_seq_group.seq_group,
-                scheduled_seq_group.token_chunk_size)
+                scheduled_seq_group.token_chunk_size,
+            )
 
         self._seq_group_metadata_cache[self.next_cache_id].reset()
 
@@ -1631,8 +1637,11 @@ class Scheduler:
         self.cache_id = self.next_cache_id
 
         # Return results
-        return (seq_group_metadata_list, scheduler_outputs,
-                allow_async_output_proc)
+        return (
+            seq_group_metadata_list,
+            scheduler_outputs,
+            allow_async_output_proc,
+        )
 
     def fork_seq(self, parent_seq: Sequence, child_seq: Sequence) -> None:
         self.block_manager.fork(parent_seq, child_seq)
@@ -1726,8 +1735,11 @@ class Scheduler:
             if len(cows) > 0:
                 blocks_to_copy.extend(cows)
 
-    def _preempt(self, seq_group: SequenceGroup,
-                 blocks_to_swap_out: List[Tuple[int, int]]) -> PreemptionMode:
+    def _preempt(
+        self,
+        seq_group: SequenceGroup,
+        blocks_to_swap_out: List[Tuple[int, int]],
+    ) -> PreemptionMode:
         # If preemption mode is not specified, we determine the mode as follows:
         # We use recomputation by default since it incurs lower overhead than
         # swapping. However, when the sequence group has multiple sequences
