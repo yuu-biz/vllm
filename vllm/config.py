@@ -12,9 +12,8 @@ from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import (TYPE_CHECKING, Any, Callable, ClassVar, Counter, Dict,
-                    Final, List, Literal, Mapping, Optional, Protocol, Set,
-                    Tuple, Type, Union)
+from typing import (TYPE_CHECKING, Any, Callable, ClassVar, Dict, Final, List,
+                    Literal, Optional, Protocol, Set, Tuple, Type, Union)
 
 import torch
 from pydantic import BaseModel, Field, PrivateAttr

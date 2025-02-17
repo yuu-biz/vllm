@@ -12,6 +12,7 @@ from starlette.datastructures import Headers
 from typing_extensions import Annotated
 
 from vllm.config import ModelConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.protocol import EngineClient
 # yapf conflicts with isort for this block
 # yapf: disable
@@ -137,6 +138,11 @@ class OpenAIServing:
                 for prompt_adapter in self.models.prompt_adapter_requests
         ]:
             return None
+        if request.model in [
+                control_vector.control_vector_name
+                for control_vector in self.models.cv_requests
+        ]:
+            return None
         return self.create_error_response(
             message=f"The model `{request.model}` does not exist.",
             err_type="NotFoundError",
@@ -144,16 +150,23 @@ class OpenAIServing:
 
     def _maybe_get_adapters(
         self, request: AnyRequest
-    ) -> Union[Tuple[None, None], Tuple[LoRARequest, None], Tuple[
-            None, PromptAdapterRequest]]:
+    ) -> Union[
+            Tuple[None, None, None],
+            Tuple[LoRARequest, None, None],
+            Tuple[None, PromptAdapterRequest, None],
+            Tuple[None, None, ControlVectorRequest],
+    ]:
         if self._is_model_supported(request.model):
-            return None, None
+            return None, None, None
         for lora in self.models.lora_requests:
             if request.model == lora.lora_name:
-                return lora, None
+                return lora, None, None
         for prompt_adapter in self.models.prompt_adapter_requests:
             if request.model == prompt_adapter.prompt_adapter_name:
-                return None, prompt_adapter
+                return None, prompt_adapter, None
+        for control_vector in self.models.cv_requests:
+            if request.model == control_vector.control_vector_name:
+                return None, None, control_vector
         # if _check_model has been called earlier, this will be unreachable
         raise ValueError(f"The model `{request.model}` does not exist.")
 
@@ -462,6 +475,7 @@ class OpenAIServing:
                                BeamSearchParams]],
         lora_request: Optional[LoRARequest],
         prompt_adapter_request: Optional[PromptAdapterRequest],
+        control_vector_request: Optional[ControlVectorRequest],
     ) -> None:
         if self.request_logger is None:
             return
@@ -483,6 +497,7 @@ class OpenAIServing:
             params=params,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
+            control_vector_request=control_vector_request,
         )
 
     async def _get_trace_headers(

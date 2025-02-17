@@ -61,16 +61,15 @@ class WorkerControlVectorManager(AbstractWorkerManager):
         try:
             control_vector = (
                 self._control_vector_model_cls.from_local_checkpoint(
-                    control_vector_request.control_vector_local_path,
+                    control_vector_request.control_vector_path,
                     control_vector_id=control_vector_request.control_vector_id,
                     config=self.control_vector_config,
                     device=str(self.device),
                     scale_factor=control_vector_request.scale_factor))
         except Exception as e:
-            raise RuntimeError(
-                f"Loading control vector "
-                f"{control_vector_request.control_vector_local_path}"
-                f" failed") from e
+            raise RuntimeError(f"Loading control vector "
+                               f"{control_vector_request.control_vector_path}"
+                               f" failed") from e
         return control_vector
 
     def add_dummy_control_vector(
@@ -81,7 +80,6 @@ class WorkerControlVectorManager(AbstractWorkerManager):
         return self._adapter_manager.pin_adapter(adapter_id)
 
     def set_active_adapters(self, requests: Set[Any]) -> None:
-        assert len(requests) <= 1, "No more than 1 control vector at a time"
         mapping = next((request.adapter_id for request in requests), None)
         set_active_adapters_worker(requests, mapping, self._apply_adapters,
                                    self._adapter_manager.set_adapter_mapping)
