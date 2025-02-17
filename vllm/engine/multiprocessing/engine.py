@@ -16,8 +16,10 @@ from vllm.engine.multiprocessing import (ENGINE_DEAD_ERROR, IPC_DATA_EXT,
                                          IPC_HEALTH_EXT, IPC_INPUT_EXT,
                                          IPC_OUTPUT_EXT, REQUEST_OUTPUTS_T,
                                          VLLM_RPC_SUCCESS_STR, RPCAbortRequest,
-                                         RPCAdapterLoadedResponse, RPCError,
-                                         RPCLoadAdapterRequest,
+                                         RPCAdapterLoadedResponse,
+                                         RPCControlVectorLoadedResponse,
+                                         RPCError, RPCLoadAdapterRequest,
+                                         RPCLoadControlVectorRequest,
                                          RPCProcessRequest,
                                          RPCResetPrefixCacheRequest,
                                          RPCStartupRequest, RPCStartupResponse,
@@ -240,6 +242,8 @@ class MQLLMEngine:
                         self.stop_profile()
                 elif isinstance(request, RPCLoadAdapterRequest):
                     self._handle_load_adapter_request(request)
+                elif isinstance(request, RPCLoadControlVectorRequest):
+                    self._handle_load_control_vector_request(request)
                 elif isinstance(request, RPCResetPrefixCacheRequest):
                     self.reset_prefix_cache()
                 else:
@@ -269,6 +273,7 @@ class MQLLMEngine:
                 lora_request=request.lora_request,
                 trace_headers=request.trace_headers,
                 prompt_adapter_request=request.prompt_adapter_request,
+                control_vector_request=request.control_vector_request,
                 priority=request.priority)
 
             if self.log_requests:
@@ -305,6 +310,23 @@ class MQLLMEngine:
         # Otherwise, send back the successful load message
         self._send_outputs(
             RPCAdapterLoadedResponse(request_id=request.request_id))
+
+    def _handle_load_control_vector_request(
+            self, request: RPCLoadControlVectorRequest):
+        try:
+            self.engine.add_control_vector(request.cv_request)
+        except BaseException as e:
+            # Send back an error if the adater fails to load
+            rpc_err = RPCError(
+                request_id=request.request_id,
+                is_engine_errored=False,
+                exception=e,
+            )
+            self._send_outputs(rpc_err)
+            return
+        # Otherwise, send back the successful load message
+        self._send_outputs(
+            RPCControlVectorLoadedResponse(request_id=request.request_id))
 
     def _health_check(self):
         # Send unhealthy if engine has already errored

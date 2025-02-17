@@ -14,7 +14,8 @@ from vllm.engine.arg_utils import AsyncEngineArgs, nullable_str
 from vllm.entrypoints.chat_utils import (ChatTemplateContentFormatOption,
                                          validate_chat_template)
 from vllm.entrypoints.openai.reasoning_parsers import ReasoningParserManager
-from vllm.entrypoints.openai.serving_models import (LoRAModulePath,
+from vllm.entrypoints.openai.serving_models import (ControlVectorPath,
+                                                    LoRAModulePath,
                                                     PromptAdapterPath)
 from vllm.entrypoints.openai.tool_parsers import ToolParserManager
 from vllm.utils import FlexibleArgumentParser
@@ -54,6 +55,41 @@ class LoRAParserAction(argparse.Action):
                         f"Invalid fields for --lora-modules: {item} - {str(e)}"
                     )
         setattr(namespace, self.dest, lora_list)
+
+
+class ControlVectorParserAction(argparse.Action):
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Optional[Union[str, Sequence[str]]],
+        option_string: Optional[str] = None,
+    ):
+        if values is None:
+            values = []
+        if isinstance(values, str):
+            raise TypeError("Expected values to be a list")
+
+        cv_list: List[ControlVectorPath] = []
+        for item in values:
+            if item in [None, '']:  # Skip if item is None or empty string
+                continue
+            if '=' in item and ',' not in item:  # Old format: name=path
+                parser.error(f"Invalid format for --control-vectors: {item}")
+            else:  # Assume JSON format
+                try:
+                    cv_dict = json.loads(item)
+                    cv = ControlVectorPath(**cv_dict)
+                    cv_list.append(cv)
+                except json.JSONDecodeError:
+                    parser.error(
+                        f"Invalid JSON format for --control-vectors: {item}")
+                except TypeError as e:
+                    parser.error(
+                        f"Invalid fields for --control-vectors: {item} - {str(e)}"  # noqa: E501
+                    )
+        setattr(namespace, self.dest, cv_list)
 
 
 class PromptAdapterParserAction(argparse.Action):
@@ -129,6 +165,17 @@ def make_arg_parser(parser: FlexibleArgumentParser) -> FlexibleArgumentParser:
         action=PromptAdapterParserAction,
         help="Prompt adapter configurations in the format name=path. "
         "Multiple adapters can be specified.")
+    parser.add_argument(
+        "--control-vectors",
+        type=nullable_str,
+        default=None,
+        nargs='+',
+        action=ControlVectorParserAction,
+        help="Control vector configurations in JSON format."
+        "Example (new format): "
+        "``{\"name\": \"name\", \"path\": \"cv_path\", "
+        "\"scale_factor\": \"value\", \"base_model_name\": \"id\"}``"
+        "Multiple vectors can be specified.")
     parser.add_argument("--chat-template",
                         type=nullable_str,
                         default=None,

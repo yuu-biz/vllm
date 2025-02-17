@@ -62,16 +62,15 @@ class WorkerControlVectorManager(AbstractWorkerManager):
         try:
             control_vector = (
                 self._control_vector_model_cls.from_local_checkpoint(
-                    control_vector_request.control_vector_local_path,
+                    control_vector_request.control_vector_path,
                     control_vector_id=control_vector_request.control_vector_id,
                     config=self.control_vector_config,
                     device=str(self.device),
                     scale_factor=control_vector_request.scale_factor))
         except Exception as e:
-            raise RuntimeError(
-                f"Loading control vector "
-                f"{control_vector_request.control_vector_local_path}"
-                f" failed") from e
+            raise RuntimeError(f"Loading control vector "
+                               f"{control_vector_request.control_vector_path}"
+                               f" failed") from e
         return control_vector
 
     def add_dummy_control_vector(

@@ -98,6 +98,7 @@ class OpenAIServingPooling(OpenAIServing):
             (
                 lora_request,
                 prompt_adapter_request,
+                control_vector_request,
             ) = self._maybe_get_adapters(request)
 
             tokenizer = await self.engine_client.get_tokenizer(lora_request)
@@ -150,7 +151,8 @@ class OpenAIServingPooling(OpenAIServing):
                                  request_prompts[i],
                                  params=pooling_params,
                                  lora_request=lora_request,
-                                 prompt_adapter_request=prompt_adapter_request)
+                                 prompt_adapter_request=prompt_adapter_request,
+                                 control_vector_request=control_vector_request)
 
                 trace_headers = (None if raw_request is None else await
                                  self._get_trace_headers(raw_request.headers))
