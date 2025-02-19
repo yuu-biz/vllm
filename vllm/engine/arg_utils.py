@@ -11,6 +11,8 @@ from typing import (TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple,
 import torch
 
 import vllm.envs as envs
+# yapf conflicts with isort for this block
+# yapf: disable
 from vllm.config import (CacheConfig, CompilationConfig, ConfigFormat,
                          ControlVectorConfig, DecodingConfig, DeviceConfig,
                          HfOverrides, KVTransferConfig, LoadConfig, LoadFormat,
@@ -19,6 +21,7 @@ from vllm.config import (CacheConfig, CompilationConfig, ConfigFormat,
                          PromptAdapterConfig, SchedulerConfig,
                          SpeculativeConfig, TaskOption, TokenizerPoolConfig,
                          VllmConfig)
+# yapf: enable
 from vllm.executor.executor_base import ExecutorBase
 from vllm.logger import init_logger
 from vllm.model_executor.layers.quantization import QUANTIZATION_METHODS
@@ -307,9 +310,6 @@ class EngineArgs:
             '"mistral" will always use the `mistral_common` tokenizer. \n* '
             '"custom" will use --tokenizer to select the '
             'preregistered tokenizer.')
-        parser.add_argument('--trust-remote-code',
-                            action='store_true',
-                            help='Trust remote code from huggingface.')
         parser.add_argument(
             "--trust-remote-code",
             action="store_true",
@@ -545,11 +545,6 @@ class EngineArgs:
             default=None,
             help='If specified, ignore GPU profiling result and use this number'
             ' of GPU blocks. Used for testing preemption.')
-        parser.add_argument('--max-num-batched-tokens',
-                            type=int,
-                            default=EngineArgs.max_num_batched_tokens,
-                            help='Maximum number of batched tokens per '
-                            'iteration.')
         parser.add_argument(
             "--max-num-partial-prefills",
             type=int,
@@ -575,10 +570,6 @@ class EngineArgs:
             "prompt is longer than this number of tokens. Defaults to 4%% of "
             "the model's context length.",
         )
-        parser.add_argument('--max-num-seqs',
-                            type=int,
-                            default=EngineArgs.max_num_seqs,
-                            help='Maximum number of sequences per iteration.')
         parser.add_argument(
             "--max-num-batched-tokens",
             type=int,
@@ -1396,7 +1387,7 @@ class EngineArgs:
             lora_dtype=self.lora_dtype,
             max_cpu_loras=self.max_cpu_loras
             if self.max_cpu_loras and self.max_cpu_loras > 0 else None,
-        ) if self.enable_lora else None)
+        ) if self.enable_lora else None
 
         if (self.qlora_adapter_name_or_path is not None
                 and self.qlora_adapter_name_or_path != ""):
