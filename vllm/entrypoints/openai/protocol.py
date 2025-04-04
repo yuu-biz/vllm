@@ -2014,9 +2014,9 @@ class TranslationRequest(OpenAIBaseModel):
     """
 
     stream: Optional[bool] = False
-    """Custom field not present in the original OpenAI definition. When set, 
+    """Custom field not present in the original OpenAI definition. When set,
     it will enable output to be streamed in a similar fashion as the Chat
-    Completion endpoint. 
+    Completion endpoint.
     """
     # Flattened stream option to simplify form data.
     stream_include_usage: Optional[bool] = False
@@ -2134,3 +2134,14 @@ class TranslationResponseVerbose(OpenAIBaseModel):
 
     words: Optional[list[TranslationWord]] = None
     """Extracted words and their corresponding timestamps."""
+
+
+class LoadControlVectorRequest(BaseModel):
+    control_vector_name: str
+    control_vector_path: str
+    control_vector_scale: float
+
+
+class UnloadControlVectorRequest(BaseModel):
+    control_vector_name: str
+    control_vector_int_id: Optional[int] = Field(default=None)

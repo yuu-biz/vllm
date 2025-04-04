@@ -7,6 +7,7 @@ from enum import Enum
 from typing import List, Mapping, Optional, Union
 
 from vllm import PoolingParams
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.inputs import PromptType
 from vllm.lora.request import LoRARequest
 from vllm.outputs import RequestOutput
@@ -42,6 +43,7 @@ class RPCProcessRequest:
         params: Union[SamplingParams, PoolingParams],
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         priority: int = 0,
@@ -52,6 +54,7 @@ class RPCProcessRequest:
         self.params = params
         self.request_id = request_id
         self.lora_request = lora_request
+        self.control_vector_request = control_vector_request
         self.trace_headers = trace_headers
         self.prompt_adapter_request = prompt_adapter_request
         self.priority = priority
@@ -122,6 +125,18 @@ class RPCLoadAdapterRequest:
 
 
 @dataclass
+class RPCLoadControlVectorRequest:
+    control_vector_request: ControlVectorRequest
+    # Set the default value of request_id to a new UUID
+    request_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+
+@dataclass
+class RPCControlVectorLoadedResponse:
+    request_id: str
+
+
+@dataclass
 class RPCAdapterLoadedResponse:
     request_id: str
 
@@ -130,10 +145,12 @@ RPC_REQUEST_T = Union[RPCProcessRequest, RPCAbortRequest, RPCStartupRequest,
                       RPCUProfileRequest, RPCLoadAdapterRequest,
                       RPCResetMultiModalCacheRequest,
                       RPCResetPrefixCacheRequest, RPCSleepRequest,
-                      RPCWakeUpRequest, RPCIsSleepingRequest]
+                      RPCWakeUpRequest, RPCIsSleepingRequest, RPCWakeUpRequest,
+                      RPCResetPrefixCacheRequest, RPCLoadControlVectorRequest]
 
 REQUEST_OUTPUTS_T = Union[List[RequestOutput], RPCAdapterLoadedResponse,
-                          RPCIsSleepingResponse, RPCError]
+                          RPCIsSleepingResponse, RPCError,
+                          RPCControlVectorLoadedResponse, RPCError]
 
 
 def ENGINE_DEAD_ERROR(

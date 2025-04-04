@@ -118,11 +118,11 @@ class ModelInputForGPU(ModelRunnerInputBase):
             "input_positions": self.input_positions,
             "lora_requests": self.lora_requests,
             "lora_mapping": self.lora_mapping,
+            "control_vector_mapping": self.control_vector_mapping,
+            "control_vector_requests": self.control_vector_requests,
             "multi_modal_kwargs": self.multi_modal_kwargs,
             "prompt_adapter_mapping": self.prompt_adapter_mapping,
             "prompt_adapter_requests": self.prompt_adapter_requests,
-            "control_vector_mapping": self.control_vector_mapping,
-            "control_vector_requests": self.control_vector_requests,
             "virtual_engine": self.virtual_engine,
             "request_ids_to_seq_ids": self.request_ids_to_seq_ids,
             "finished_requests_ids": self.finished_requests_ids,
@@ -171,11 +171,11 @@ class ModelInputForGPUWithSamplingMetadata(ModelInputForGPU):
             "input_positions": self.input_positions,
             "lora_requests": self.lora_requests,
             "lora_mapping": self.lora_mapping,
+            "control_vector_mapping": self.control_vector_mapping,
+            "control_vector_requests": self.control_vector_requests,
             "multi_modal_kwargs": self.multi_modal_kwargs,
             "prompt_adapter_mapping": self.prompt_adapter_mapping,
             "prompt_adapter_requests": self.prompt_adapter_requests,
-            "control_vector_mapping": self.control_vector_mapping,
-            "control_vector_requests": self.control_vector_requests,
             "virtual_engine": self.virtual_engine,
             "request_ids_to_seq_ids": self.request_ids_to_seq_ids,
             "finished_requests_ids": self.finished_requests_ids,
@@ -1668,6 +1668,9 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
                         self.set_active_loras(set([dummy_lora_request]),
                                               lora_mapping)
 
+                    if self.control_vector_config:
+                        self.set_active_control_vectors(set())
+
                     if self.prompt_adapter_config:
                         prompt_adapter_mapping = PromptAdapterMapping(
                             [-1] * batch_size,
@@ -1675,9 +1678,6 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
                         )
                         self.set_active_prompt_adapters(
                             set(), prompt_adapter_mapping)
-
-                    if self.control_vector_config:
-                        self.set_active_control_vectors(set())
 
                     graph_runner = CUDAGraphRunner(
                         self.model, self.attn_backend.get_name(),

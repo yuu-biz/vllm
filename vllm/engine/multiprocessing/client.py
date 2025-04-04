@@ -27,10 +27,12 @@ from vllm.engine.multiprocessing import (ENGINE_DEAD_ERROR, IPC_DATA_EXT,
                                          IPC_HEALTH_EXT, IPC_INPUT_EXT,
                                          IPC_OUTPUT_EXT, RPC_REQUEST_T,
                                          VLLM_RPC_SUCCESS_STR, RPCAbortRequest,
-                                         RPCAdapterLoadedResponse, RPCError,
-                                         RPCIsSleepingRequest,
+                                         RPCAdapterLoadedResponse,
+                                         RPCControlVectorLoadedResponse,
+                                         RPCError, RPCIsSleepingRequest,
                                          RPCIsSleepingResponse,
                                          RPCLoadAdapterRequest,
+                                         RPCLoadControlVectorRequest,
                                          RPCProcessRequest,
                                          RPCResetMultiModalCacheRequest,
                                          RPCResetPrefixCacheRequest,
@@ -252,7 +254,8 @@ class MQLLMEngineClient(EngineClient):
                 # Put each output into the appropriate queue.
                 elif isinstance(
                         request_outputs,
-                    (RPCAdapterLoadedResponse, RPCIsSleepingResponse)):
+                    (RPCAdapterLoadedResponse, RPCControlVectorLoadedResponse,
+                     RPCIsSleepingResponse)):
                     self._add_output(request_outputs)
                 else:
                     for request_output in request_outputs:
@@ -263,6 +266,7 @@ class MQLLMEngineClient(EngineClient):
 
     def _add_output(self, request_output: Union[RequestOutput,
                                                 RPCAdapterLoadedResponse,
+                                                RPCControlVectorLoadedResponse,
                                                 RPCIsSleepingResponse]):
         queue = self.output_queues.get(request_output.request_id)
         if queue is not None:
@@ -448,9 +452,9 @@ class MQLLMEngineClient(EngineClient):
         sampling_params: SamplingParams,
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
-        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> AsyncGenerator[RequestOutput, None]:
         """Generate outputs for a request.
@@ -476,8 +480,9 @@ class MQLLMEngineClient(EngineClient):
         return cast(
             AsyncGenerator[RequestOutput, None],
             self._process_request(prompt, sampling_params, request_id,
-                                  lora_request, trace_headers,
-                                  prompt_adapter_request, priority))
+                                  lora_request, control_vector_request,
+                                  trace_headers, prompt_adapter_request,
+                                  priority))
 
     def encode(
         self,
@@ -513,7 +518,7 @@ class MQLLMEngineClient(EngineClient):
                                   pooling_params,
                                   request_id,
                                   lora_request,
-                                  trace_headers,
+                                  trace_headers=trace_headers,
                                   priority=priority))
 
     async def _process_request(
@@ -522,6 +527,7 @@ class MQLLMEngineClient(EngineClient):
         params: Union[SamplingParams, PoolingParams],
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         priority: int = 0,
@@ -576,6 +582,7 @@ class MQLLMEngineClient(EngineClient):
                     params=params,
                     request_id=request_id,
                     lora_request=lora_request,
+                    control_vector_request=control_vector_request,
                     trace_headers=trace_headers,
                     prompt_adapter_request=prompt_adapter_request,
                     priority=priority,

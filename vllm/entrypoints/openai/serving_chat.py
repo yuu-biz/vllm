@@ -148,10 +148,12 @@ class OpenAIServingChat(OpenAIServing):
         try:
             (
                 lora_request,
+                control_vector_request,
                 prompt_adapter_request,
             ) = self._maybe_get_adapters(request)
 
-            model_name = self._get_model_name(request.model, lora_request)
+            model_name = self.models.model_name(lora_request,
+                                                control_vector_request)
 
             tokenizer = await self.engine_client.get_tokenizer(lora_request)
 
@@ -230,6 +232,7 @@ class OpenAIServingChat(OpenAIServing):
                                  request_prompts[i],
                                  params=sampling_params,
                                  lora_request=lora_request,
+                                 control_vector_request=control_vector_request,
                                  prompt_adapter_request=prompt_adapter_request)
 
                 trace_headers = (None if raw_request is None else await
@@ -248,6 +251,7 @@ class OpenAIServingChat(OpenAIServing):
                         sampling_params,
                         request_id,
                         lora_request=lora_request,
+                        control_vector_request=control_vector_request,
                         trace_headers=trace_headers,
                         prompt_adapter_request=prompt_adapter_request,
                         priority=request.priority,
