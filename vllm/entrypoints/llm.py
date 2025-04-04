@@ -1222,7 +1222,7 @@ class LLM:
             use_tqdm=use_tqdm,
             lora_request=lora_request,
             prompt_adapter_request=prompt_adapter_request,
-        )
+            control_vector_request=None)
 
         outputs = self._run_engine(use_tqdm=use_tqdm)
         items = self.engine_class.validate_outputs(outputs,
