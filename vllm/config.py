@@ -3015,6 +3015,23 @@ class LoRAConfig:
 
 @config
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
+class ControlVectorConfig:
+    """Configuration for ControlVectors."""
+
+    max_control_vectors: int = 1
+    """Maximum number of ControlVectors in a batch."""
+    adapter_dtype: Optional[torch.dtype] = torch.float16
+    """Data type for ControlVectors."""
+    normalize: bool = False
+    """Enable normalization for ControlVectors."""
+
+    def __post_init__(self):
+        if self.max_control_vectors < 1:
+            raise ValueError("max_control_vectors must be >= 1")
+
+
+@config
+@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class PromptAdapterConfig:
     """Configuration for PromptAdapters."""
 
@@ -4291,6 +4308,8 @@ class VllmConfig:
     """Load configuration."""
     lora_config: Optional[LoRAConfig] = None
     """LoRA configuration."""
+    control_vector_config: Optional[ControlVectorConfig] = None
+    """Control vector configuration."""
     speculative_config: Optional[SpeculativeConfig] = None
     """Speculative decoding configuration."""
     decoding_config: DecodingConfig = field(default_factory=DecodingConfig)
