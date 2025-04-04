@@ -121,6 +121,8 @@ class ModelInputForGPU(ModelRunnerInputBase):
             "multi_modal_kwargs": self.multi_modal_kwargs,
             "prompt_adapter_mapping": self.prompt_adapter_mapping,
             "prompt_adapter_requests": self.prompt_adapter_requests,
+            "control_vector_mapping": self.control_vector_mapping,
+            "control_vector_requests": self.control_vector_requests,
             "virtual_engine": self.virtual_engine,
             "request_ids_to_seq_ids": self.request_ids_to_seq_ids,
             "finished_requests_ids": self.finished_requests_ids,
@@ -172,6 +174,8 @@ class ModelInputForGPUWithSamplingMetadata(ModelInputForGPU):
             "multi_modal_kwargs": self.multi_modal_kwargs,
             "prompt_adapter_mapping": self.prompt_adapter_mapping,
             "prompt_adapter_requests": self.prompt_adapter_requests,
+            "control_vector_mapping": self.control_vector_mapping,
+            "control_vector_requests": self.control_vector_requests,
             "virtual_engine": self.virtual_engine,
             "request_ids_to_seq_ids": self.request_ids_to_seq_ids,
             "finished_requests_ids": self.finished_requests_ids,
@@ -381,7 +385,6 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
                             prompt_adapter_prompt_mapping
                     else:
                         self.prompt_adapter_prompt_mapping.clear()
-
             else:
                 self.input_tokens = input_tokens or []
                 self.inputs_embeds = inputs_embeds
@@ -406,10 +409,10 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
                     prompt_adapter_prompt_mapping or [])
 
             self.prompt_adapter_request = prompt_adapter_request
+            self.control_vector_request = control_vector_request
+
             self.multi_modal_kwargs = multi_modal_kwargs
             self.multi_modal_placeholder_maps = multi_modal_placeholder_maps
-
-            self.control_vector_request = control_vector_request
 
             self.prefix_cache_hit = prefix_cache_hit
 
@@ -713,6 +716,8 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
         inter_data: InterDataForSeqGroup,
         seq_group_metadata: SequenceGroupMetadata,
     ):
+        """If control vector is enabled, compute index and prompt mapping.
+        """
         if not self.enable_control_vector:
             return
         inter_data.control_vector_request = (
@@ -1670,6 +1675,10 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
                         )
                         self.set_active_prompt_adapters(
                             set(), prompt_adapter_mapping)
+
+                    if self.control_vector_config:
+                        self.set_active_control_vectors(set())
+
                     graph_runner = CUDAGraphRunner(
                         self.model, self.attn_backend.get_name(),
                         self.attn_state.graph_clone(batch_size),
