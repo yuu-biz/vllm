@@ -96,6 +96,7 @@ class OpenAIServingPooling(OpenAIServing):
                 self.max_model_len, truncate_prompt_tokens)
             (
                 lora_request,
+                control_vector_request,
                 prompt_adapter_request,
             ) = self._maybe_get_adapters(request)
 
@@ -149,6 +150,7 @@ class OpenAIServingPooling(OpenAIServing):
                                  request_prompts[i],
                                  params=pooling_params,
                                  lora_request=lora_request,
+                                 control_vector_request=control_vector_request,
                                  prompt_adapter_request=prompt_adapter_request)
 
                 trace_headers = (None if raw_request is None else await

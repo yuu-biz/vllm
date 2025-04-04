@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 from dataclasses import dataclass
+from typing import Optional
 
 from vllm.adapter_commons.request import AdapterRequest
 
@@ -12,8 +13,9 @@ class ControlVectorRequest(AdapterRequest):
 
     control_vector_name: str
     control_vector_id: int
-    control_vector_local_path: str
+    control_vector_path: str
     scale: float = 1.0
+    base_model_name: Optional[str] = None
 
     def __hash__(self):
         return super().__hash__()
@@ -27,8 +29,8 @@ class ControlVectorRequest(AdapterRequest):
         return self.control_vector_name
 
     @property
-    def local_path(self):
-        return self.control_vector_local_path
+    def path(self):
+        return self.control_vector_path
 
     @property
     def scale_factor(self):

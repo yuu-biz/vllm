@@ -30,6 +30,7 @@ else:
 
 import vllm.envs as envs
 from vllm.config import ModelConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.protocol import EngineClient
 # yapf conflicts with isort for this block
 # yapf: disable
@@ -132,7 +133,7 @@ RequestT = TypeVar("RequestT", bound=AnyRequest)
 
 class RequestProcessingMixin(BaseModel):
     """
-    Mixin for request processing, 
+    Mixin for request processing,
     handling prompt preparation and engine input.
     """
     request_prompts: Optional[Sequence[RequestPrompt]] = []
@@ -144,7 +145,7 @@ class RequestProcessingMixin(BaseModel):
 
 class ResponseGenerationMixin(BaseModel):
     """
-    Mixin for response generation, 
+    Mixin for response generation,
     managing result generators and final batch results.
     """
     result_generator: Optional[AsyncGenerator[tuple[int, Union[
@@ -438,6 +439,11 @@ class OpenAIServing:
                 load_result.code == HTTPStatus.BAD_REQUEST.value:
                 error_response = load_result
         if request.model in [
+                control_vector.control_vector_name
+                for control_vector in self.models.control_vector_requests
+        ]:
+            return None
+        if request.model in [
                 prompt_adapter.prompt_adapter_name
                 for prompt_adapter in self.models.prompt_adapter_requests
         ]:
@@ -450,16 +456,23 @@ class OpenAIServing:
 
     def _maybe_get_adapters(
         self, request: AnyRequest
-    ) -> Union[tuple[None, None], tuple[LoRARequest, None], tuple[
-            None, PromptAdapterRequest]]:
+    ) -> Union[
+            tuple[None, None, None],
+            tuple[LoRARequest, None, None],
+            tuple[None, None, ControlVectorRequest],
+            tuple[None, PromptAdapterRequest, None],
+    ]:
         if self._is_model_supported(request.model):
-            return None, None
+            return None, None, None
         for lora in self.models.lora_requests:
             if request.model == lora.lora_name:
-                return lora, None
+                return lora, None, None
+        for control_vector in self.models.control_vector_requests:
+            if request.model == control_vector.control_vector_name:
+                return None, None, control_vector
         for prompt_adapter in self.models.prompt_adapter_requests:
             if request.model == prompt_adapter.prompt_adapter_name:
-                return None, prompt_adapter
+                return None, prompt_adapter, None
         # if _check_model has been called earlier, this will be unreachable
         raise ValueError(f"The model `{request.model}` does not exist.")
 
@@ -895,6 +908,7 @@ class OpenAIServing:
         params: Optional[Union[SamplingParams, PoolingParams,
                                BeamSearchParams]],
         lora_request: Optional[LoRARequest],
+        control_vector_request: Optional[ControlVectorRequest],
         prompt_adapter_request: Optional[PromptAdapterRequest],
     ) -> None:
         if self.request_logger is None:
@@ -917,8 +931,8 @@ class OpenAIServing:
             prompt_embeds,
             params=params,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             prompt_adapter_request=prompt_adapter_request,
-            control_vector_request=None,
         )
 
     async def _get_trace_headers(

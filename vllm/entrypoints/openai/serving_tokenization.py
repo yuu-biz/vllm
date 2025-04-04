@@ -60,6 +60,7 @@ class OpenAIServingTokenization(OpenAIServing):
         try:
             (
                 lora_request,
+                control_vector_request,
                 prompt_adapter_request,
             ) = self._maybe_get_adapters(request)
 
@@ -103,6 +104,7 @@ class OpenAIServingTokenization(OpenAIServing):
                              request_prompts[i],
                              params=None,
                              lora_request=lora_request,
+                             control_vector_request=control_vector_request,
                              prompt_adapter_request=prompt_adapter_request)
 
             # Silently ignore prompt adapter since it does not affect
@@ -133,6 +135,7 @@ class OpenAIServingTokenization(OpenAIServing):
 
         (
             lora_request,
+            control_vector_request,
             prompt_adapter_request,
         ) = self._maybe_get_adapters(request)
 
@@ -142,6 +145,7 @@ class OpenAIServingTokenization(OpenAIServing):
                          request.tokens,
                          params=None,
                          lora_request=lora_request,
+                         control_vector_request=control_vector_request,
                          prompt_adapter_request=prompt_adapter_request)
 
         # Silently ignore prompt adapter since it does not affect tokenization

@@ -166,6 +166,20 @@ class ExecutorBase(ABC):
             assert s == sets[0], "All workers should have the same LORAs."
         return sets[0]
 
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        assert control_vector_request.adapter_id > 0, \
+            "control vector's adapter_id must be greater than 0."
+        return all(
+            self.collective_rpc("add_control_vector",
+                                args=(control_vector_request, )))
+
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        assert control_vector_id > 0, "control_vector_id must be greater than 0."
+        return all(
+            self.collective_rpc("remove_control_vector",
+                                args=(control_vector_id, )))
+
     def add_prompt_adapter(
             self, prompt_adapter_request: PromptAdapterRequest) -> bool:
         assert prompt_adapter_request.prompt_adapter_id > 0, \
@@ -194,20 +208,6 @@ class ExecutorBase(ABC):
             assert (s == sets[0]
                     ), "All workers should have the same prompt adapters."
         return sets[0]
-
-    def add_control_vector(
-            self, control_vector_request: ControlVectorRequest) -> bool:
-        assert control_vector_request.adapter_id > 0, \
-            "control vector's adapter_id must be greater than 0."
-        return all(
-            self.collective_rpc("add_control_vector",
-                                args=(control_vector_request, )))
-
-    def remove_control_vector(self, control_vector_id: int) -> bool:
-        assert control_vector_id > 0, "control_vector_id must be greater than 0."
-        return all(
-            self.collective_rpc("remove_control_vector",
-                                args=(control_vector_id, )))
 
     def start_profile(self) -> None:
         self.collective_rpc("start_profile")
@@ -261,6 +261,15 @@ class ExecutorBase(ABC):
                             kwargs=dict(path=path,
                                         pattern=pattern,
                                         max_size=max_size))
+
+    @abstractmethod
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        raise NotImplementedError
 
     @abstractmethod
     def check_health(self) -> None:

@@ -63,6 +63,7 @@ from vllm.entrypoints.openai.protocol import (ChatCompletionRequest,
                                               EmbeddingCompletionRequest,
                                               EmbeddingRequest,
                                               EmbeddingResponse, ErrorResponse,
+                                              LoadControlVectorRequest,
                                               LoadLoRAAdapterRequest,
                                               PoolingChatRequest,
                                               PoolingCompletionRequest,
@@ -73,6 +74,7 @@ from vllm.entrypoints.openai.protocol import (ChatCompletionRequest,
                                               TokenizeResponse,
                                               TranscriptionRequest,
                                               TranscriptionResponse,
+                                              UnloadControlVectorRequest,
                                               UnloadLoRAAdapterRequest)
 # yapf: enable
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
@@ -1002,6 +1004,34 @@ if envs.VLLM_ALLOW_RUNTIME_LORA_UPDATING:
         return Response(status_code=200, content=response)
 
 
+if envs.VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING:
+    logger.warning(
+        "Control vector dynamic loading & unloading is enabled in the API "
+        "server. This should ONLY be used for local development!")
+
+    @router.post("/v1/load_control_vector")
+    async def load_control_vector(request: LoadControlVectorRequest,
+                                  raw_request: Request):
+        handler = models(raw_request)
+        response = await handler.load_control_vector(request)
+        if isinstance(response, ErrorResponse):
+            return JSONResponse(content=response.model_dump(),
+                                status_code=response.code)
+
+        return Response(status_code=200, content=response)
+
+    @router.post("/v1/unload_control_vector")
+    async def unload_control_vector(request: UnloadControlVectorRequest,
+                                    raw_request: Request):
+        handler = models(raw_request)
+        response = await handler.unload_control_vector(request)
+        if isinstance(response, ErrorResponse):
+            return JSONResponse(content=response.model_dump(),
+                                status_code=response.code)
+
+        return Response(status_code=200, content=response)
+
+
 def load_log_config(log_config_file: Optional[str]) -> Optional[dict]:
     if not log_config_file:
         return None
@@ -1174,9 +1204,11 @@ async def init_app_state(
         model_config=model_config,
         base_model_paths=base_model_paths,
         lora_modules=args.lora_modules,
+        control_vectors=args.control_vectors,
         prompt_adapters=args.prompt_adapters,
     )
     await state.openai_serving_models.init_static_loras()
+    await state.openai_serving_models.init_static_control_vectors()
     state.openai_serving_chat = OpenAIServingChat(
         engine_client,
         model_config,
