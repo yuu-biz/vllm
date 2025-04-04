@@ -1716,3 +1716,14 @@ class TranscriptionResponseVerbose(OpenAIBaseModel):
 
     words: Optional[list[TranscriptionWord]] = None
     """Extracted words and their corresponding timestamps."""
+
+
+class LoadControlVectorRequest(BaseModel):
+    cv_name: str
+    cv_path: str
+    cv_scale: float
+
+
+class UnloadControlVectorRequest(BaseModel):
+    cv_name: str
+    cv_int_id: Optional[int] = Field(default=None)

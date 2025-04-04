@@ -262,6 +262,15 @@ class ExecutorBase(ABC):
                                         max_size=max_size))
 
     @abstractmethod
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_control_vector(self, cv_id: int) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
     def check_health(self) -> None:
         """Checks if the executor is healthy. If not, it should raise an
         exception."""

@@ -7,12 +7,18 @@ from http import HTTPStatus
 from typing import Optional, Union
 
 from vllm.config import ModelConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.protocol import EngineClient
+# yapf conflicts with isort for this block
+# yapf: disable
 from vllm.entrypoints.openai.protocol import (ErrorResponse,
+                                              LoadControlVectorRequest,
                                               LoadLoRAAdapterRequest,
                                               ModelCard, ModelList,
                                               ModelPermission,
+                                              UnloadControlVectorRequest,
                                               UnloadLoRAAdapterRequest)
+# yapf: enable
 from vllm.logger import init_logger
 from vllm.lora.request import LoRARequest
 from vllm.prompt_adapter.request import PromptAdapterRequest
@@ -40,6 +46,14 @@ class LoRAModulePath:
     base_model_name: Optional[str] = None
 
 
+@dataclass
+class ControlVectorPath:
+    name: str
+    path: str
+    scale_factor: float
+    base_model_name: Optional[str] = None
+
+
 class OpenAIServingModels:
     """Shared instance to hold data about the loaded base model(s) and adapters.
 
@@ -47,6 +61,8 @@ class OpenAIServingModels:
     - /v1/models
     - /v1/load_lora_adapter
     - /v1/unload_lora_adapter
+    - /v1/load_control_vector
+    - /v1/unload_control_vector
     """
 
     def __init__(
@@ -57,6 +73,7 @@ class OpenAIServingModels:
         *,
         lora_modules: Optional[list[LoRAModulePath]] = None,
         prompt_adapters: Optional[list[PromptAdapterPath]] = None,
+        control_vectors: Optional[list[ControlVectorPath]] = None,
     ):
         super().__init__()
 
@@ -67,6 +84,10 @@ class OpenAIServingModels:
         self.static_lora_modules = lora_modules
         self.lora_requests: list[LoRARequest] = []
         self.lora_id_counter = AtomicCounter(0)
+
+        self.static_control_vectors = control_vectors
+        self.cv_requests: list[ControlVectorRequest] = []
+        self.cv_id_counter = AtomicCounter(0)
 
         self.prompt_adapter_requests = []
         if prompt_adapters is not None:
@@ -95,10 +116,29 @@ class OpenAIServingModels:
             if isinstance(load_result, ErrorResponse):
                 raise ValueError(load_result.message)
 
-    def is_base_model(self, model_name) -> bool:
+    async def init_static_control_vectors(self):
+        """Loads all static control vectors.
+        Raises if any fail to load"""
+        if self.static_control_vectors is None:
+            return
+        for cv in self.static_control_vectors:
+            cv_request = LoadControlVectorRequest(cv_path=cv.path,
+                                                  cv_name=cv.name,
+                                                  cv_scale=cv.scale_factor)
+
+            load_result = await self.load_control_vector(
+                request=cv_request, base_model_name=cv.base_model_name)
+            if isinstance(load_result, ErrorResponse):
+                raise ValueError(load_result.message)
+
+    def is_base_model(self, model_name):
         return any(model.name == model_name for model in self.base_model_paths)
 
-    def model_name(self, lora_request: Optional[LoRARequest] = None) -> str:
+    def model_name(
+        self,
+        lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
+    ) -> str:
         """Returns the appropriate model name depending on the availability
         and support of the LoRA or base model.
         Parameters:
@@ -108,6 +148,8 @@ class OpenAIServingModels:
         """
         if lora_request is not None:
             return lora_request.lora_name
+        if control_vector_request is not None:
+            return control_vector_request.control_vector_name
         return self.base_model_paths[0].name
 
     async def show_available_models(self) -> ModelList:
@@ -134,8 +176,17 @@ class OpenAIServingModels:
                       permission=[ModelPermission()])
             for prompt_adapter in self.prompt_adapter_requests
         ]
+        control_vector_cards = [
+            ModelCard(id=cv.control_vector_name,
+                      root=cv.control_vector_path,
+                      parent=cv.base_model_name
+                      if cv.base_model_name else self.base_model_paths[0].name,
+                      permission=[ModelPermission()])
+            for cv in self.cv_requests
+        ]
         model_cards.extend(lora_cards)
         model_cards.extend(prompt_adapter_cards)
+        model_cards.extend(control_vector_cards)
         return ModelList(data=model_cards)
 
     async def load_lora_adapter(
@@ -231,6 +282,119 @@ class OpenAIServingModels:
                 f"The lora adapter '{request.lora_name}' cannot be found.",
                 err_type="NotFoundError",
                 status_code=HTTPStatus.NOT_FOUND)
+
+        return None
+
+    async def load_control_vector(
+        self,
+        request: LoadControlVectorRequest,
+        base_model_name: Optional[str] = None,
+    ) -> Union[ErrorResponse, str]:
+        error_check_ret = await self._check_load_control_vector_request(request
+                                                                        )
+        if error_check_ret is not None:
+            return error_check_ret
+
+        cv_name, cv_path, scale = (
+            request.cv_name,
+            request.cv_path,
+            request.cv_scale,
+        )
+        unique_id = self.cv_id_counter.inc(1)
+        cv_request = ControlVectorRequest(control_vector_name=cv_name,
+                                          control_vector_id=unique_id,
+                                          control_vector_path=cv_path,
+                                          scale=scale,
+                                          base_model_name=None)
+        if base_model_name is not None and self.is_base_model(base_model_name):
+            cv_request.base_model_name = base_model_name
+
+        # Validate that the adapter can be loaded into the engine
+        # This will also pre-load it for incoming requests
+        try:
+            logger.info("Try to load new control vector: name '%s', path '%s'",
+                        cv_name, cv_path)
+            await self.engine_client.add_control_vector(cv_request)
+        except BaseException as e:
+            error_type = "BadRequestError"
+            status_code = HTTPStatus.BAD_REQUEST
+            if isinstance(e, ValueError) and "No adapter found" in str(e):
+                error_type = "NotFoundError"
+                status_code = HTTPStatus.NOT_FOUND
+
+            logger.error(
+                "Cannot load new control vector: name '%s', path '%s'",
+                cv_name, cv_path)
+            return create_error_response(message=str(e),
+                                         err_type=error_type,
+                                         status_code=status_code)
+
+        self.cv_requests.append(cv_request)
+        logger.info("Loaded new control vector: name '%s', path '%s'", cv_name,
+                    cv_path)
+        return f"Success: Control vector '{cv_name}' added successfully."
+
+    async def unload_control_vector(
+            self,
+            request: UnloadControlVectorRequest) -> Union[ErrorResponse, str]:
+        error_check_ret = await self._check_unload_control_vector_request(
+            request)
+        if error_check_ret is not None:
+            return error_check_ret
+
+        cv_name = request.cv_name
+        self.cv_requests = [
+            cv_request for cv_request in self.cv_requests
+            if cv_request.control_vector_name != cv_name
+        ]
+        logger.info("Removed control vector: name '%s'", cv_name)
+        return f"Success: control vector '{cv_name}' removed successfully."
+
+    async def _check_load_control_vector_request(
+            self,
+            request: LoadControlVectorRequest) -> Optional[ErrorResponse]:
+        # Check if both 'lora_name' and 'lora_path' are provided
+        if not request.cv_name or not request.cv_path:
+            return create_error_response(
+                message="Both 'cv_name' and 'cv_path' must be provided.",
+                err_type="InvalidUserInput",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        # Check if the lora adapter with the given name already exists
+        if any(cv_request.control_vector_name == request.cv_name
+               for cv_request in self.cv_requests):
+            return create_error_response(
+                message=
+                f"The control vector '{request.cv_name}' has already been "
+                "loaded.",
+                err_type="InvalidUserInput",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        return None
+
+    async def _check_unload_control_vector_request(
+            self,
+            request: UnloadControlVectorRequest) -> Optional[ErrorResponse]:
+        # Check if either 'lora_name' or 'lora_int_id' is provided
+        if not request.cv_name and not request.cv_int_id:
+            return create_error_response(
+                message=
+                "either 'cv_name' and 'cv_int_id' needs to be provided.",
+                err_type="InvalidUserInput",
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+
+        # Check if the lora adapter with the given name exists
+        if not any(cv_request.control_vector_name == request.cv_name
+                   for cv_request in self.cv_requests):
+            return create_error_response(
+                message=
+                f"The control vector '{request.cv_name}' cannot be found.",
+                err_type="NotFoundError",
+                status_code=HTTPStatus.NOT_FOUND,
+            )
 
         return None
 
