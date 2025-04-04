@@ -1854,6 +1854,12 @@ class LLMEngine:
     def pin_lora(self, lora_id: int) -> bool:
         return self.model_executor.pin_lora(lora_id)
 
+    def add_control_vector(self, control_vector_request: ControlVectorRequest) -> bool:
+        return self.model_executor.add_control_vector(control_vector_request)
+
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        return self.model_executor.remove_control_vector(control_vector_id)
+
     def add_prompt_adapter(
             self, prompt_adapter_request: PromptAdapterRequest) -> bool:
         return self.model_executor.add_prompt_adapter(prompt_adapter_request)
