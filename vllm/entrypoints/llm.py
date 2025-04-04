@@ -19,6 +19,7 @@ from vllm.beam_search import (BeamSearchInstance, BeamSearchOutput,
                               create_sort_beams_key_function)
 from vllm.config import (CompilationConfig, ModelDType, TokenizerMode,
                          is_init_field)
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.arg_utils import (EngineArgs, HfOverrides, PoolerConfig,
                                    TaskOption)
 from vllm.engine.llm_engine import LLMEngine
@@ -404,6 +405,7 @@ class LLM:
         prompt_token_ids: Optional[Union[list[int], list[list[int]]]] = None,
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         lora_request: Optional[Union[list[LoRARequest], LoRARequest]] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         guided_options_request: Optional[Union[LLMGuidedOptions,
                                                GuidedDecodingRequest]] = None,
@@ -486,6 +488,7 @@ class LLM:
             params=sampling_params,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             prompt_adapter_request=prompt_adapter_request,
             guided_options=guided_options_request,
             priority=priority,
@@ -959,6 +962,7 @@ class LLM:
         truncate_prompt_tokens: Optional[int] = None,
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         lora_request: Optional[Union[list[LoRARequest], LoRARequest]] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
     ) -> list[PoolingRequestOutput]:
         """Apply pooling to the hidden states corresponding to the input
@@ -1033,6 +1037,7 @@ class LLM:
             params=pooling_params,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             tokenization_kwargs=tokenization_kwargs,
             prompt_adapter_request=prompt_adapter_request,
         )
@@ -1228,6 +1233,7 @@ class LLM:
         truncate_prompt_tokens: Optional[int] = None,
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         lora_request: Optional[Union[list[LoRARequest], LoRARequest]] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
     ) -> list[ScoringRequestOutput]:
         """Generate similarity scores for all pairs `<text,text_pair>`.
@@ -1339,16 +1345,16 @@ class LLM:
         during the sleep period, before `wake_up` is called.
 
         Args:
-            level: The sleep level. Level 1 sleep will offload the model 
-                weights and discard the kv cache. The content of kv cache 
+            level: The sleep level. Level 1 sleep will offload the model
+                weights and discard the kv cache. The content of kv cache
                 is forgotten. Level 1 sleep is good for sleeping and waking
-                up the engine to run the same model again. The model weights 
-                are backed up in CPU memory. Please make sure there's enough 
-                CPU memory to store the model weights. Level 2 sleep will 
-                discard both the model weights and the kv cache. The content 
-                of both the model weights and kv cache is forgotten. Level 2 
+                up the engine to run the same model again. The model weights
+                are backed up in CPU memory. Please make sure there's enough
+                CPU memory to store the model weights. Level 2 sleep will
+                discard both the model weights and the kv cache. The content
+                of both the model weights and kv cache is forgotten. Level 2
                 sleep is good for sleeping and waking up the engine to run a
-                different model or update the model, where previous model 
+                different model or update the model, where previous model
                 weights are not needed. It reduces CPU memory pressure.
         """
         self.reset_prefix_cache()
@@ -1358,12 +1364,12 @@ class LLM:
         """
         Wake up the engine from sleep mode. See the [sleep][] method
         for more details.
-        
+
         Args:
-            tags: An optional list of tags to reallocate the engine memory 
-                for specific memory allocations. Values must be in 
+            tags: An optional list of tags to reallocate the engine memory
+                for specific memory allocations. Values must be in
                 `("weights", "kv_cache")`. If None, all memory is reallocated.
-                wake_up should be called with all tags (or None) before the 
+                wake_up should be called with all tags (or None) before the
                 engine is used again.
         """
         self.llm_engine.wake_up(tags)
@@ -1432,6 +1438,7 @@ class LLM:
         *,
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         lora_request: Optional[Union[Sequence[LoRARequest], LoRARequest]],
+        control_vector_request: Optional[ControlVectorRequest],
         prompt_adapter_request: Optional[PromptAdapterRequest],
         tokenization_kwargs: Optional[dict[str, Any]] = None,
         guided_options: Optional[GuidedDecodingRequest] = None,
@@ -1488,6 +1495,7 @@ class LLM:
         params: Union[SamplingParams, PoolingParams],
         tokenization_kwargs: Optional[dict[str, Any]] = None,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         priority: int = 0,
     ) -> None:
@@ -1497,6 +1505,7 @@ class LLM:
             prompt,
             params,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             tokenization_kwargs=tokenization_kwargs,
             prompt_adapter_request=prompt_adapter_request,
             priority=priority,

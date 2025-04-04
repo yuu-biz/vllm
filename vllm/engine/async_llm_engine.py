@@ -13,6 +13,7 @@ from weakref import ReferenceType
 import vllm.envs as envs
 from vllm.config import (DecodingConfig, LoRAConfig, ModelConfig,
                          ParallelConfig, SchedulerConfig, VllmConfig)
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.core.scheduler import SchedulerOutputs
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_timeout import asyncio_timeout
@@ -434,6 +435,7 @@ class _AsyncLLMEngine(LLMEngine):
         params: Union[SamplingParams, PoolingParams],
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         priority: int = 0,
@@ -489,6 +491,7 @@ class _AsyncLLMEngine(LLMEngine):
             params=params,
             arrival_time=arrival_time,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             prompt_adapter_request=prompt_adapter_request,
             trace_headers=trace_headers,
             priority=priority,
@@ -1033,7 +1036,7 @@ class AsyncLLMEngine(EngineClient):
         ```
         # Please refer to entrypoints/api_server.py for
         # the complete example.
-    
+
         # initialize the engine and the example input
         # note that engine_args here is AsyncEngineArgs instance
         engine = AsyncLLMEngine.from_engine_args(engine_args)
@@ -1041,13 +1044,13 @@ class AsyncLLMEngine(EngineClient):
             "input": "What is LLM?",
             "request_id": 0,
         }
-    
+
         # start the generation
         results_generator = engine.encode(
         example_input["input"],
         PoolingParams(),
         example_input["request_id"])
-    
+
         # get the results
         final_output = None
         async for request_output in results_generator:
@@ -1057,7 +1060,7 @@ class AsyncLLMEngine(EngineClient):
                 # Return or raise an error
                 ...
             final_output = request_output
-    
+
         # Process and return the final output
         ...
         ```

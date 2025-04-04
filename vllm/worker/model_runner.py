@@ -23,6 +23,10 @@ from vllm.attention import AttentionMetadata, get_attn_backend
 from vllm.attention.backends.abstract import AttentionState
 from vllm.attention.backends.utils import CommonAttentionState
 from vllm.config import CompilationLevel, VllmConfig
+from vllm.control_vectors.layers import ControlVectorMapping
+from vllm.control_vectors.request import ControlVectorRequest
+from vllm.control_vectors.worker_manager import (
+    LRUCacheWorkerControlVectorManager)
 from vllm.core.scheduler import SchedulerOutputs
 from vllm.distributed import broadcast_tensor_dict, get_pp_group
 from vllm.distributed.kv_transfer import get_kv_transfer_group
@@ -94,6 +98,8 @@ class ModelInputForGPU(ModelRunnerInputBase):
     query_lens: Optional[List[int]] = None
     lora_mapping: Optional["LoRAMapping"] = None
     lora_requests: Optional[Set[LoRARequest]] = None
+    control_vector_mapping: Optional[ControlVectorMapping] = None
+    control_vector_requests: Optional[Set[ControlVectorRequest]] = None
     attn_metadata: Optional["AttentionMetadata"] = None
     prompt_adapter_mapping: Optional[PromptAdapterMapping] = None
     prompt_adapter_requests: Optional[Set[PromptAdapterRequest]] = None
@@ -252,6 +258,10 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             lora_prompt_mapping: Optional[List[List[int]]] = None,
             lora_requests: Optional[Set[LoRARequest]] = None,
 
+            # Control vector inputs.
+            control_vector_mapping: Optional[List[int]] = None,
+            control_vector_request: Optional[ControlVectorRequest] = None,
+
             # Prompt adapter inputs.
             prompt_adapter_index_mapping: Optional[List[int]] = None,
             prompt_adapter_prompt_mapping: Optional[List[int]] = None,
@@ -398,6 +408,9 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             self.prompt_adapter_request = prompt_adapter_request
             self.multi_modal_kwargs = multi_modal_kwargs
             self.multi_modal_placeholder_maps = multi_modal_placeholder_maps
+
+            self.control_vector_request = control_vector_request
+
             self.prefix_cache_hit = prefix_cache_hit
 
             self.n_seqs = len(self.seq_ids)
@@ -486,7 +499,7 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
         # WARNING: The order of the functions matters!
         self.per_seq_group_compute_fns = [
             self._compute_prompt_adapter_input,
-            self._compute_multi_modal_input,
+            self._compute_multi_modal_input, self._compute_control_vector_input
         ]
 
         self.runner = runner
@@ -496,6 +509,8 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
         self.sliding_window = self.runner.sliding_window
         self.block_size = self.runner.block_size
         self.enable_lora = self.runner.lora_config is not None
+        self.enable_control_vector = (self.runner.control_vector_config
+                                      is not None)
         self.enable_prompt_adapter = (self.runner.prompt_adapter_config
                                       is not None)
 
@@ -692,6 +707,16 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             inter_data.lora_prompt_mapping.append([lora_id])
         else:
             inter_data.lora_prompt_mapping.append([])
+
+    def _compute_control_vector_input(
+        self,
+        inter_data: InterDataForSeqGroup,
+        seq_group_metadata: SequenceGroupMetadata,
+    ):
+        if not self.enable_control_vector:
+            return
+        inter_data.control_vector_request = (
+            seq_group_metadata.control_vector_request)
 
     def _compute_prompt_adapter_input(
             self, inter_data: InterDataForSeqGroup,
@@ -1009,6 +1034,13 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
                        prompt_mapping=lora_prompt_mapping,
                        is_prefill=not self.decode_only))
 
+        # Control vector data.
+        control_vector_requests: Set[ControlVectorRequest] = set()
+        if self.enable_control_vector:
+            control_vector_requests = set(data.control_vector_request
+                                          for data in self.inter_data_list
+                                          if data.control_vector_request)
+
         # Prompt adapter data.
         prompt_adapter_requests: Set[PromptAdapterRequest] = set()
         prompt_adapter_mapping = None
@@ -1049,6 +1081,7 @@ class ModelInputForGPUBuilder(ModelRunnerInputBuilderBase[ModelInputForGPU]):
             query_lens=query_lens,
             lora_mapping=lora_mapping,
             lora_requests=lora_requests,
+            control_vector_requests=control_vector_requests,
             multi_modal_kwargs=multi_modal_kwargs,
             request_ids_to_seq_ids=request_ids_to_seq_ids,
             finished_requests_ids=self.finished_requests_ids,
@@ -1144,6 +1177,7 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         self.model: nn.Module  # Set after load_model
         # Set after load_model.
         self.lora_manager: Optional[LRUCacheWorkerLoRAManager] = None
+        self.control_vector_manager: LRUCacheWorkerControlVectorManager = None
         self.prompt_adapter_manager: LRUCacheWorkerPromptAdapterManager = None
         self.sampler = get_sampler()
 
@@ -1203,6 +1237,14 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         logger.info("Model loading took %.4f GiB and %.6f seconds",
                     self.model_memory_usage / GiB_bytes,
                     time_after_load - time_before_load)
+
+        if self.control_vector_config:
+            self.control_vector_manager = LRUCacheWorkerControlVectorManager(
+                self.device, self.control_vector_config)
+            self.model = (
+                self.control_vector_manager.create_control_vector_manager(
+                    self.model))
+
         if self.prompt_adapter_config:
             self.prompt_adapter_manager = LRUCacheWorkerPromptAdapterManager(
                 self.scheduler_config.max_num_seqs,
@@ -1460,6 +1502,24 @@ class GPUModelRunnerBase(ModelRunnerBase[TModelInputForGPU]):
         if not self.lora_manager:
             raise RuntimeError("LoRA is not enabled.")
         return self.lora_manager.list_adapters()
+
+    def set_active_control_vectors(
+            self, control_vector_requests: Set[ControlVectorRequest]):
+        if not self.control_vector_manager:
+            raise RuntimeError("Control Vector is not enabled.")
+        self.control_vector_manager.set_active_adapters(
+            control_vector_requests)
+
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        if not self.control_vector_manager:
+            raise RuntimeError("Control Vector is not enabled.")
+        return self.control_vector_manager.add_adapter(control_vector_request)
+
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        if not self.control_vector_manager:
+            raise RuntimeError("Control Vector is not enabled.")
+        return self.control_vector_manager.remove_adapter(control_vector_id)
 
     def remove_all_prompt_adapters(self):
         if not self.prompt_adapter_manager:
@@ -1769,6 +1829,11 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
             assert model_input.lora_mapping is not None
             self.set_active_loras(model_input.lora_requests,
                                   model_input.lora_mapping)
+
+        if self.control_vector_config:
+            assert model_input.control_vector_requests is not None
+            self.set_active_control_vectors(
+                model_input.control_vector_requests, )
 
         if self.prompt_adapter_config:
             assert model_input.prompt_adapter_requests is not None

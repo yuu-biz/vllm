@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional, Union
 import msgspec
 import torch
 
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.inputs import SingletonInputs
 from vllm.lora.request import LoRARequest
 from vllm.multimodal import MultiModalKwargs, MultiModalPlaceholderDict
@@ -729,6 +730,7 @@ class SequenceGroup:
                  arrival_time: float,
                  sampling_params: Optional[SamplingParams] = None,
                  lora_request: Optional[LoRARequest] = None,
+                 control_vector_request: Optional[ControlVectorRequest] = None,
                  pooling_params: Optional[PoolingParams] = None,
                  pooled_data: Optional[torch.Tensor] = None,
                  encoder_seq: Optional[Sequence] = None,
@@ -753,6 +755,7 @@ class SequenceGroup:
                                       draft_size)
         self.last_token_latency = 0.0
         self.lora_request = lora_request
+        self.control_vector_request = control_vector_request
         self.prompt_logprobs: Optional[PromptLogprobs] = None
         self.state = SequenceGroupState()
         self.pooling_params = pooling_params
@@ -1007,6 +1010,7 @@ class SequenceGroupMetadata(
         token_chunk_size: The number of tokens to be processed (per sequence).
             None if chunking is not required.
         lora_request: LoRA request.
+        control_vector_request: Contorol Vector request.
         computed_block_nums: The block numbers that are already computed,
             used in prefix caching.
         state: Internal state tied to this sequence group.
@@ -1032,6 +1036,7 @@ class SequenceGroupMetadata(
     do_sample: bool = True
     pooling_params: Optional[PoolingParams] = None
     lora_request: Optional[LoRARequest] = None
+    control_vector_request: Optional[ControlVectorRequest] = None
     computed_block_nums: Optional[list[int]] = None
     state: Optional[SequenceGroupState] = msgspec.field(
         default_factory=lambda: SequenceGroupState())
@@ -1061,6 +1066,11 @@ class SequenceGroupMetadata(
     @property
     def lora_int_id(self) -> int:
         return self.lora_request.lora_int_id if self.lora_request else 0
+
+    @property
+    def control_vector_id(self) -> int:
+        return self.control_vector_request.adapter_id \
+            if self.control_vector_request else 0
 
     @property
     def prompt_adapter_id(self) -> int:
@@ -1369,6 +1379,7 @@ class ExecuteModelRequest(
         omit_defaults=True):  # type: ignore[call-arg]
     """The model execution request, containing CPU metadata only. The LLM
     engine should create an instance of this class for each request batch."""
+
     # The sequence group metadata list.
     seq_group_metadata_list: list[Union[SequenceGroupMetadata,
                                         SequenceGroupMetadataDelta]]
@@ -1520,6 +1531,7 @@ class ParallelSampleSequenceGroup(SequenceGroupBase):
             arrival_time=seq_group.arrival_time,
             sampling_params=original_params,
             lora_request=seq_group.lora_request,
+            control_vector_request=seq_group.control_vector_request,
             pooling_params=seq_group.pooling_params,
             pooled_data=seq_group.pooled_data,
             encoder_seq=seq_group.encoder_seq,

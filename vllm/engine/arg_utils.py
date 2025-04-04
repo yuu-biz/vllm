@@ -17,10 +17,11 @@ import regex as re
 import torch
 from pydantic import TypeAdapter, ValidationError
 from typing_extensions import TypeIs, deprecated
-
+# yapf conflicts with isort for this block
+# yapf: disable
 import vllm.envs as envs
 from vllm.config import (BlockSize, CacheConfig, CacheDType, CompilationConfig,
-                         ConfigFormat, ConfigType, DecodingConfig,
+                         ConfigFormat, ConfigType, ControlVectorConfig, DecodingConfig,
                          DetailedTraceModules, Device, DeviceConfig,
                          DistributedExecutorBackend, GuidedDecodingBackend,
                          GuidedDecodingBackendV1, HfOverrides, KVEventsConfig,
@@ -31,6 +32,7 @@ from vllm.config import (BlockSize, CacheConfig, CacheDType, CompilationConfig,
                          SchedulerConfig, SchedulerPolicy, SpeculativeConfig,
                          TaskOption, TokenizerMode, TokenizerPoolConfig,
                          VllmConfig, get_attr_docs, get_field)
+# yapf: enable
 from vllm.executor.executor_base import ExecutorBase
 from vllm.logger import init_logger
 from vllm.model_executor.layers.quantization import QuantizationMethods
@@ -363,6 +365,10 @@ class EngineArgs:
     lora_extra_vocab_size: int = LoRAConfig.lora_extra_vocab_size
     long_lora_scaling_factors: Optional[tuple[float, ...]] = \
         LoRAConfig.long_lora_scaling_factors
+    # ControlVector fields
+    enable_control_vector: bool = False
+    max_control_vectors: int = ControlVectorConfig.max_control_vectors
+    normalize_control_vector: bool = ControlVectorConfig.normalize
     # PromptAdapter fields
     enable_prompt_adapter: bool = False
     max_prompt_adapters: int = PromptAdapterConfig.max_prompt_adapters
@@ -748,6 +754,23 @@ class EngineArgs:
                                 **lora_kwargs["max_cpu_loras"])
         lora_group.add_argument("--fully-sharded-loras",
                                 **lora_kwargs["fully_sharded_loras"])
+
+        # ControlVector related configs
+        control_vector_kwargs = get_kwargs(ControlVectorConfig)
+        control_vector_group = parser.add_argument_group(
+            title="ControlVectorConfig",
+            description=ControlVectorConfig.__doc__,
+        )
+        control_vector_group.add_argument(
+            "--enable-control-vector",
+            action=argparse.BooleanOptionalAction,
+            help="If True, enable handling of ControlVectors.")
+        control_vector_group.add_argument(
+            "--max-control-vectors",
+            **control_vector_kwargs["max_control_vectors"])
+        control_vector_group.add_argument(
+            "--normalize-control-vector",
+            **control_vector_kwargs["normalize"])
 
         # PromptAdapter related configs
         prompt_adapter_kwargs = get_kwargs(PromptAdapterConfig)
@@ -1200,6 +1223,11 @@ class EngineArgs:
             max_cpu_loras=self.max_cpu_loras if self.max_cpu_loras
             and self.max_cpu_loras > 0 else None) if self.enable_lora else None
 
+        control_vector_config = ControlVectorConfig(
+            max_control_vectors=self.max_control_vectors,
+            normalize=self.normalize_control_vector,
+        ) if self.enable_control_vector else None
+
         # bitsandbytes pre-quantized model need a specific model loader
         if model_config.quantization == "bitsandbytes":
             self.quantization = self.load_format = "bitsandbytes"
@@ -1234,6 +1262,7 @@ class EngineArgs:
             scheduler_config=scheduler_config,
             device_config=device_config,
             lora_config=lora_config,
+            control_vector_config=control_vector_config,
             speculative_config=speculative_config,
             load_config=load_config,
             decoding_config=decoding_config,

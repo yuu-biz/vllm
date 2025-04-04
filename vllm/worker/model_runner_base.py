@@ -183,6 +183,7 @@ class ModelRunnerBase(ABC, Generic[T]):
         self.model_config = vllm_config.model_config
         self.cache_config = vllm_config.cache_config
         self.lora_config = vllm_config.lora_config
+        self.control_vector_config = vllm_config.control_vector_config
         self.load_config = vllm_config.load_config
         self.parallel_config = vllm_config.parallel_config
         self.scheduler_config = vllm_config.scheduler_config
