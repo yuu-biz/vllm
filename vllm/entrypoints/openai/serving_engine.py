@@ -461,8 +461,8 @@ class OpenAIServing:
     ) -> Union[
             tuple[None, None, None],
             tuple[LoRARequest, None, None],
-            tuple[None, None, ControlVectorRequest],
-            tuple[None, PromptAdapterRequest, None],
+            tuple[None, ControlVectorRequest, None],
+            tuple[None, None, PromptAdapterRequest],
     ]:
         if self._is_model_supported(request.model):
             return None, None, None
@@ -471,10 +471,10 @@ class OpenAIServing:
                 return lora, None, None
         for control_vector in self.models.control_vector_requests:
             if request.model == control_vector.control_vector_name:
-                return None, None, control_vector
+                return None, control_vector, None
         for prompt_adapter in self.models.prompt_adapter_requests:
             if request.model == prompt_adapter.prompt_adapter_name:
-                return None, prompt_adapter, None
+                return None, None, prompt_adapter
         # if _check_model has been called earlier, this will be unreachable
         raise ValueError(f"The model `{request.model}` does not exist.")
 
