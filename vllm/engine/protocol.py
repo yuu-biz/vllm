@@ -328,7 +328,9 @@ class EngineClient(ABC):
         ...
 
     @abstractmethod
-    async def add_control_vector(self,
-                                 control_vector_request: ControlVectorRequest) -> None:
-        """Load a new ControlVector adapter into the engine for future requests."""
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> None:
+        """
+        Load a new ControlVector adapter into the engine for future requests.
+        """
         ...

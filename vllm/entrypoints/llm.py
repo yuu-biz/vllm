@@ -1221,8 +1221,8 @@ class LLM:
             params=pooling_params,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
-            prompt_adapter_request=prompt_adapter_request,
-            control_vector_request=None)
+            control_vector_request=None,
+            prompt_adapter_request=prompt_adapter_request)
 
         outputs = self._run_engine(use_tqdm=use_tqdm)
         items = self.engine_class.validate_outputs(outputs,

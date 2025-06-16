@@ -17,16 +17,18 @@ import regex as re
 import torch
 from pydantic import TypeAdapter, ValidationError
 from typing_extensions import TypeIs, deprecated
+
 # yapf conflicts with isort for this block
 # yapf: disable
 import vllm.envs as envs
 from vllm.config import (BlockSize, CacheConfig, CacheDType, CompilationConfig,
-                         ConfigFormat, ConfigType, ControlVectorConfig, DecodingConfig,
-                         DetailedTraceModules, Device, DeviceConfig,
-                         DistributedExecutorBackend, GuidedDecodingBackend,
-                         GuidedDecodingBackendV1, HfOverrides, KVEventsConfig,
-                         KVTransferConfig, LoadConfig, LoadFormat, LoRAConfig,
-                         ModelConfig, ModelDType, ModelImpl, MultiModalConfig,
+                         ConfigFormat, ConfigType, ControlVectorConfig,
+                         DecodingConfig, DetailedTraceModules, Device,
+                         DeviceConfig, DistributedExecutorBackend,
+                         GuidedDecodingBackend, GuidedDecodingBackendV1,
+                         HfOverrides, KVEventsConfig, KVTransferConfig,
+                         LoadConfig, LoadFormat, LoRAConfig, ModelConfig,
+                         ModelDType, ModelImpl, MultiModalConfig,
                          ObservabilityConfig, ParallelConfig, PoolerConfig,
                          PrefixCachingHashAlgo, PromptAdapterConfig,
                          SchedulerConfig, SchedulerPolicy, SpeculativeConfig,
@@ -768,9 +770,8 @@ class EngineArgs:
         control_vector_group.add_argument(
             "--max-control-vectors",
             **control_vector_kwargs["max_control_vectors"])
-        control_vector_group.add_argument(
-            "--normalize-control-vector",
-            **control_vector_kwargs["normalize"])
+        control_vector_group.add_argument("--normalize-control-vector",
+                                          **control_vector_kwargs["normalize"])
 
         # PromptAdapter related configs
         prompt_adapter_kwargs = get_kwargs(PromptAdapterConfig)
