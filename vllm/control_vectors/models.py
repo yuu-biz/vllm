@@ -111,8 +111,8 @@ class ControlVectorModel(AdapterModel):
                         ".gguf file has invalid direction field name: %s",
                         tensor.name) from e
                 np_copy = np.array(tensor.data, copy=True)
-                control_vector_weights[layer] = torch.from_numpy(np_copy).to(device).to(
-                    config.adapter_dtype)
+                control_vector_weights[layer] = torch.from_numpy(np_copy).to(
+                    device).to(config.adapter_dtype)
 
             return cls(control_vector_id, control_vector_weights, scale_factor)
 
@@ -202,7 +202,8 @@ class ControlVectorModelManager(AdapterModelManager):
                 if isinstance(module, _all_control_vector_classes[key]):
                     continue
                 new_module = self.replace_submodule(
-                    self.model, module_name, _all_control_vector_classes[key](module))
+                    self.model, module_name,
+                    _all_control_vector_classes[key](module))
                 new_module.set_layer_id(parse_number_from_string(module_name))
                 self.register_module(module_name, new_module)
                 new_module.set_normalization(
@@ -253,7 +254,8 @@ class ControlVectorModelManager(AdapterModelManager):
 
 class ControlVectorLRUCache(AdapterLRUCache[ControlVectorModel]):
 
-    def __init__(self, capacity: int, deactivate_control_vector_fn: Callable[[int], bool]):
+    def __init__(self, capacity: int,
+                 deactivate_control_vector_fn: Callable[[int], bool]):
         super().__init__(capacity, deactivate_control_vector_fn)
 
 

@@ -450,8 +450,9 @@ class _AsyncLLMEngine(LLMEngine):
                              "not enabled!")
         if (control_vector_request is not None
                 and not self.control_vector_config):
-            raise ValueError(f"Got control_vector_request {control_vector_request} but "
-                             "control vector is not enabled!")
+            raise ValueError(
+                f"Got control_vector_request {control_vector_request} but "
+                "control vector is not enabled!")
         if priority != 0 and not self.scheduler_config.policy == "priority":
             raise ValueError(f"Got priority {priority} but "
                              "Priority scheduling is not enabled.")
@@ -1192,8 +1193,8 @@ class AsyncLLMEngine(EngineClient):
     async def add_lora(self, lora_request: LoRARequest) -> None:
         self.engine.add_lora(lora_request)
 
-    async def add_control_vector(self,
-                                 control_vector_request: ControlVectorRequest) -> None:
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> None:
         self.engine.add_control_vector(control_vector_request)
 
     async def collective_rpc(self,

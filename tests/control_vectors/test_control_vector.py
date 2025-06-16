@@ -5,8 +5,10 @@ from vllm import LLM, EngineArgs, LLMEngine, SamplingParams
 from vllm.control_vectors.request import ControlVectorRequest
 
 MODEL_PATH = "Qwen/Qwen2.5-1.5B-Instruct"
-control_vector_path_happy = "yuu-biz/qwen-cv-example/happy_vector_qwen.gguf"
-control_vector_path_spanish = "yuu-biz/qwen-cv-example/english_spanish_vector_qwen.gguf"
+control_vector_path_happy = \
+    "yuu-biz/qwen-cv-example/happy_vector_qwen.gguf"
+control_vector_path_spanish = \
+    "yuu-biz/qwen-cv-example/english_spanish_vector_qwen.gguf"
 
 
 @pytest.fixture
@@ -19,14 +21,16 @@ def requests():
             SamplingParams(temperature=0.0,
                            max_tokens=100,
                            stop=["[/assistant]"]),
-            ControlVectorRequest("spanish", 1, control_vector_path_spanish, 2.0),
+            ControlVectorRequest("spanish", 1, control_vector_path_spanish,
+                                 2.0),
         ),
         (
             prompt_text,
             SamplingParams(temperature=0.0,
                            max_tokens=100,
                            stop=["[/assistant]"]),
-            ControlVectorRequest("spanish", 2, control_vector_path_spanish, 1.0),
+            ControlVectorRequest("spanish", 2, control_vector_path_spanish,
+                                 1.0),
         ),
         (
             prompt_text,
@@ -40,14 +44,16 @@ def requests():
             SamplingParams(temperature=0.0,
                            max_tokens=100,
                            stop=["[/assistant]"]),
-            ControlVectorRequest("spanish", 3, control_vector_path_spanish, -1.0),
+            ControlVectorRequest("spanish", 3, control_vector_path_spanish,
+                                 -1.0),
         ),
         (
             prompt_text,
             SamplingParams(temperature=0.0,
                            max_tokens=100,
                            stop=["[/assistant]"]),
-            ControlVectorRequest("spanish", 4, control_vector_path_spanish, -2.0),
+            ControlVectorRequest("spanish", 4, control_vector_path_spanish,
+                                 -2.0),
         ),
         (
             prompt_text,
@@ -146,9 +152,11 @@ def test_offline_inferance(requests):
             "generation":
             result[0].outputs[0].text,
             "control_vector_name":
-            control_vector_request.control_vector_name if control_vector_request else None,
+            control_vector_request.control_vector_name
+            if control_vector_request else None,
             "scale":
-            control_vector_request.scale_factor if control_vector_request else None
+            control_vector_request.scale_factor
+            if control_vector_request else None
         })
     assert len(results) == 10
 

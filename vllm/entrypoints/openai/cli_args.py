@@ -166,14 +166,6 @@ def make_arg_parser(parser: FlexibleArgumentParser) -> FlexibleArgumentParser:
         "``{\"name\": \"name\", \"path\": \"lora_path\", "
         "\"base_model_name\": \"id\"}``")
     parser.add_argument(
-        "--prompt-adapters",
-        type=optional_type(str),
-        default=None,
-        nargs='+',
-        action=PromptAdapterParserAction,
-        help="Prompt adapter configurations in the format name=path. "
-        "Multiple adapters can be specified.")
-    parser.add_argument(
         "--control-vectors",
         type=optional_type(str),
         default=None,
@@ -184,6 +176,14 @@ def make_arg_parser(parser: FlexibleArgumentParser) -> FlexibleArgumentParser:
         "``{\"name\": \"name\", \"path\": \"control_vector_path\", "
         "\"scale_factor\": \"value\", \"base_model_name\": \"id\"}``"
         "Multiple vectors can be specified.")
+    parser.add_argument(
+        "--prompt-adapters",
+        type=optional_type(str),
+        default=None,
+        nargs='+',
+        action=PromptAdapterParserAction,
+        help="Prompt adapter configurations in the format name=path. "
+        "Multiple adapters can be specified.")
     parser.add_argument("--chat-template",
                         type=optional_type(str),
                         default=None,

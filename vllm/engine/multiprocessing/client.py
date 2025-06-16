@@ -470,6 +470,8 @@ class MQLLMEngineClient(EngineClient):
             sampling_params: The sampling parameters of the request.
             request_id: The unique id of the request.
             lora_request: LoRA request to use for generation, if any.
+            control_vector_request: ControlVector request to use
+                                            for generation, if any.
             trace_headers: OpenTelemetry trace headers.
             prompt_adapter_request: Prompt Adapter request to use
                                             for generation, if any.
@@ -689,7 +691,26 @@ class MQLLMEngineClient(EngineClient):
         if isinstance(request_output, BaseException):
             raise request_output
 
-    async def add_control_vector(self,
-                                 cv_request: ControlVectorRequest) -> None:
-        """Load a new control vector into the engine for future requests."""
-        pass
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> None:
+        """
+        Load a new ControlVector adapter into the enginefor future requests.
+        """
+        # Uses the same I/O as generate requests
+        request = RPCLoadControlVectorRequest(control_vector_request)
+
+        # Create output queue for this requests.
+        queue: asyncio.Queue[Union[None, BaseException]] = asyncio.Queue()
+        self.output_queues[request.request_id] = queue
+
+        # Send the request
+        request_bytes = pickle.dumps(request)
+        await self.input_socket.send_multipart((request_bytes, ), copy=False)
+
+        # Wait for the response
+        request_output = await queue.get()
+        self.output_queues.pop(request.request_id)
+
+        # Raise on error, otherwise happily return None
+        if isinstance(request_output, BaseException):
+            raise request_output
