@@ -16,6 +16,9 @@ from vllm.v1.utils import ConstantList
 if TYPE_CHECKING:
     from vllm.lora.request import LoRARequest
 
+if TYPE_CHECKING:
+    from vllm.control_vectors.request import ControlVectorRequest
+
 
 class Request:
 
@@ -31,6 +34,7 @@ class Request:
         eos_token_id: Optional[int],
         client_index: int = 0,
         lora_request: Optional["LoRARequest"] = None,
+        control_vector_request: Optional["ControlVectorRequest"] = None,
         structured_output_request: Optional["StructuredOutputRequest"] = None,
         cache_salt: Optional[str] = None,
     ) -> None:
@@ -41,6 +45,7 @@ class Request:
         # Because of LoRA, the eos token id can be different for each request.
         self.eos_token_id = eos_token_id
         self.lora_request = lora_request
+        self.control_vector_request = control_vector_request
         self.structured_output_request = structured_output_request
 
         self.status = RequestStatus.WAITING
@@ -115,6 +120,7 @@ class Request:
             pooling_params=request.pooling_params,
             eos_token_id=request.eos_token_id,
             lora_request=request.lora_request,
+            control_vector_request=request.control_vector_request,
             structured_output_request=StructuredOutputRequest(
                 sampling_params=request.sampling_params) \
                     if request.sampling_params else None,

@@ -8,6 +8,7 @@ from typing import Optional, cast
 import numpy as np
 import torch
 
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.lora.request import LoRARequest
 from vllm.multimodal.inputs import MultiModalKwargs, PlaceholderRange
 from vllm.pooling_params import PoolingParams
@@ -41,6 +42,8 @@ class CachedRequestState:
     mrope_position_delta: Optional[int] = None
 
     lora_request: Optional[LoRARequest] = None
+
+    control_vector_request: Optional[ControlVectorRequest] = None
 
     def __post_init__(self):
         self.num_prompt_tokens = len(self.prompt_token_ids)
@@ -199,6 +202,13 @@ class InputBatch:
                                              dtype=np.int32)
         self.lora_id_to_request_ids: dict[int, set[str]] = {}
         self.lora_id_to_lora_request: dict[int, LoRARequest] = {}
+
+        # control_vector related
+        self.request_control_vector_mapping = np.zeros((self.max_num_reqs, ),
+                                                       dtype=np.int32)
+        self.control_vector_id_to_request_ids: dict[int, set[str]] = {}
+        self.control_vector_id_to_control_vector_request: dict[
+            int, ControlVectorRequest] = {}
 
         # req_index -> generator
         # NOTE(woosuk): The indices of the requests that do not have their own
@@ -365,6 +375,22 @@ class InputBatch:
             # No LoRA
             self.request_lora_mapping[req_index] = 0
 
+        # Add request control_vector ID
+        if request.control_vector_request:
+            control_vector_id = request.control_vector_request.control_vector_id
+            if control_vector_id not in self.control_vector_id_to_request_ids:
+                self.control_vector_id_to_request_ids[control_vector_id] = set(
+                )
+
+            self.request_control_vector_mapping[req_index] = control_vector_id
+            self.control_vector_id_to_request_ids[control_vector_id].add(
+                request.req_id)
+            self.control_vector_id_to_control_vector_request[
+                control_vector_id] = request.control_vector_request
+        else:
+            # No ControlVector
+            self.request_control_vector_mapping[req_index] = 0
+
     def remove_request(self, req_id: str) -> Optional[int]:
         """This method must always be followed by a call to condense()."""
 
@@ -396,6 +422,18 @@ class InputBatch:
                 self.lora_id_to_request_ids.pop(lora_id)
                 self.lora_id_to_lora_request.pop(lora_id)
             self.request_lora_mapping[req_index] = 0
+
+        # ControlVector
+        control_vector_id = self.request_control_vector_mapping[req_index]
+        if control_vector_id != 0:
+            self.control_vector_id_to_request_ids[control_vector_id].discard(
+                req_id)
+            if len(self.control_vector_id_to_request_ids[control_vector_id]
+                   ) == 0:
+                self.control_vector_id_to_request_ids.pop(control_vector_id)
+                self.control_vector_id_to_control_vector_request.pop(
+                    control_vector_id)
+            self.request_control_vector_mapping[req_index] = 0
 
         self.logit_bias[req_index] = None
         self.has_allowed_token_ids.discard(req_id)
@@ -454,6 +492,10 @@ class InputBatch:
 
         self.request_lora_mapping[i1], self.request_lora_mapping[i2] =\
             self.request_lora_mapping[i2], self.request_lora_mapping[i1]
+        self.request_control_vector_mapping[i1],
+        self.request_control_vector_mapping[i2] =\
+            self.request_control_vector_mapping[i2],
+        self.request_control_vector_mapping[i1]
         self.logit_bias[i1], self.logit_bias[i2] =\
             self.logit_bias[i2], self.logit_bias[i1]
 
@@ -532,6 +574,10 @@ class InputBatch:
 
             self.request_lora_mapping[empty_index] = self.request_lora_mapping[
                 last_req_index]
+
+            self.request_control_vector_mapping[
+                empty_index] = self.request_control_vector_mapping[
+                    last_req_index]
 
             self.logit_bias[empty_index] = self.logit_bias[last_req_index]
 
@@ -673,6 +719,12 @@ class InputBatch:
             self.lora_id_to_lora_request.values())
 
         return prompt_lora_mapping, token_lora_mapping, active_lora_requests
+
+    def make_control_vector_inputs(self):
+        active_control_vector_requests: set[ControlVectorRequest] = set(
+            self.control_vector_id_to_control_vector_request.values())
+
+        return active_control_vector_requests
 
     @property
     def num_reqs(self) -> int:

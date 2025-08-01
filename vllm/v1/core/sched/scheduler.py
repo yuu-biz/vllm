@@ -50,6 +50,7 @@ class Scheduler(SchedulerInterface):
         self.scheduler_config = vllm_config.scheduler_config
         self.cache_config = vllm_config.cache_config
         self.lora_config = vllm_config.lora_config
+        self.control_vector_config = vllm_config.control_vector_config
         self.kv_cache_config = kv_cache_config
         self.kv_events_config = vllm_config.kv_events_config
         self.log_stats = log_stats
@@ -311,6 +312,16 @@ class Scheduler(SchedulerInterface):
                 if req.lora_request and req.lora_request.lora_int_id > 0)
             assert len(scheduled_loras) <= self.lora_config.max_loras
 
+        # Record the ControlVectors in scheduled_running_reqs
+        scheduled_control_vectors: set[int] = set()
+        if self.control_vector_config:
+            scheduled_control_vectors = set(
+                req.control_vector_request.control_vector_id
+                for req in scheduled_running_reqs if req.control_vector_request
+                and req.control_vector_request.control_vector_id > 0)
+            assert (len(scheduled_control_vectors)
+                    <= self.control_vector_config.max_control_vectors)
+
         # Use a temporary deque to collect requests that need to be skipped
         # and put back at the head of the waiting queue later
         skipped_waiting_requests: deque[Request] = deque()
@@ -354,6 +365,19 @@ class Scheduler(SchedulerInterface):
                         and request.lora_request.lora_int_id
                         not in scheduled_loras):
                     # Scheduling would exceed max_loras, skip.
+                    self.waiting.popleft()
+                    skipped_waiting_requests.appendleft(request)
+                    continue
+
+                # Check that adding the request still respects the
+                # max_control_vectors constraint.
+                if (self.control_vector_config
+                        and request.control_vector_request
+                        and len(scheduled_control_vectors)
+                        == self.control_vector_config.max_control_vectors
+                        and request.control_vector_request.control_vector_id
+                        not in scheduled_control_vectors):
+                    # Scheduling would exceed max_control_vectors, skip.
                     self.waiting.popleft()
                     skipped_waiting_requests.appendleft(request)
                     continue
@@ -474,6 +498,10 @@ class Scheduler(SchedulerInterface):
 
                 if self.lora_config and request.lora_request:
                     scheduled_loras.add(request.lora_request.lora_int_id)
+                if (self.control_vector_config
+                        and request.control_vector_request):
+                    scheduled_control_vectors.add(
+                        request.control_vector_request.control_vector_id)
                 req_to_new_block_ids[request.request_id] = (
                     self.kv_cache_manager.get_block_ids(request.request_id))
                 num_scheduled_tokens[request.request_id] = num_new_tokens
