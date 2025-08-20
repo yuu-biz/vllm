@@ -17,6 +17,7 @@ from starlette.datastructures import Headers
 
 import vllm.envs as envs
 from vllm.beam_search import BeamSearchSequence, create_sort_beams_key_function
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.config import ModelConfig
 from vllm.engine.protocol import EngineClient
 from vllm.entrypoints.chat_utils import ChatTemplateContentFormatOption
@@ -436,6 +437,11 @@ class OpenAIServing:
                 and load_result.error.code == HTTPStatus.BAD_REQUEST.value
             ):
                 error_response = load_result
+        if request.model in [
+                control_vector.control_vector_name
+                for control_vector in self.models.control_vector_requests
+        ]:
+            return None 
 
         return error_response or self.create_error_response(
             message=f"The model `{request.model}` does not exist.",
@@ -471,19 +477,28 @@ class OpenAIServing:
         self,
         request: AnyRequest,
         supports_default_mm_loras: bool = False,
-    ) -> LoRARequest | None:
+    ) -> Union[
+            tuple[None, None],
+            tuple[LoRARequest, None],
+            tuple[None, ControlVectorRequest],
+    ]:
+
         if request.model in self.models.lora_requests:
-            return self.models.lora_requests[request.model]
+            return self.models.lora_requests[request.model], None
+
+        for control_vector in self.models.control_vector_requests:
+            if request.model == control_vector.control_vector_name:
+                return None, control_vector
 
         # Currently only support default modality specific loras
         # if we have exactly one lora matched on the request.
         if supports_default_mm_loras:
             default_mm_lora = self._get_active_default_mm_loras(request)
             if default_mm_lora is not None:
-                return default_mm_lora
+                return default_mm_lora, None
 
         if self._is_model_supported(request.model):
-            return None
+            return None, None
 
         # if _check_model has been called earlier, this will be unreachable
         raise ValueError(f"The model `{request.model}` does not exist.")
@@ -560,6 +575,7 @@ class OpenAIServing:
         inputs: PromptType | EngineInput,
         params: SamplingParams | BeamSearchParams | None,
         lora_request: LoRARequest | None,
+        control_vector_request: ControlVectorRequest | None,
     ) -> None:
         if self.request_logger is None:
             return
@@ -573,6 +589,7 @@ class OpenAIServing:
             components.embeds,
             params=params,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
         )
 
     async def _get_trace_headers(

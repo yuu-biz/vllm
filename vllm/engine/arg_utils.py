@@ -45,6 +45,7 @@ from vllm.config import (
     KVTransferConfig,
     LoadConfig,
     LoRAConfig,
+    ControlVectorConfig,
     MambaConfig,
     ModelConfig,
     MultiModalConfig,
@@ -564,6 +565,10 @@ class EngineArgs:
     max_cpu_loras: int | None = LoRAConfig.max_cpu_loras
     lora_dtype: str | torch.dtype | None = LoRAConfig.lora_dtype
     lora_target_modules: list[str] | None = LoRAConfig.target_modules
+    enable_control_vector: bool = False
+    # ControlVector fields
+    max_control_vectors: int = ControlVectorConfig.max_control_vectors
+    normalize_control_vector: bool = ControlVectorConfig.normalize
     enable_tower_connector_lora: bool = LoRAConfig.enable_tower_connector_lora
     specialize_active_lora: bool = LoRAConfig.specialize_active_lora
 
@@ -1251,6 +1256,22 @@ class EngineArgs:
         lora_group.add_argument(
             "--specialize-active-lora", **lora_kwargs["specialize_active_lora"]
         )
+
+        # ControlVector related configs
+        control_vector_kwargs = get_kwargs(ControlVectorConfig)
+        control_vector_group = parser.add_argument_group(
+            title="ControlVectorConfig",
+            description=ControlVectorConfig.__doc__,
+        )
+        control_vector_group.add_argument(
+            "--enable-control-vector",
+            action=argparse.BooleanOptionalAction,
+            help="If True, enable handling of ControlVectors.")
+        control_vector_group.add_argument(
+            "--max-control-vectors",
+            **control_vector_kwargs["max_control_vectors"])
+        control_vector_group.add_argument("--normalize-control-vector",
+                                          **control_vector_kwargs["normalize"])
 
         # Observability arguments
         observability_kwargs = get_kwargs(ObservabilityConfig)
@@ -2009,6 +2030,20 @@ class EngineArgs:
                 "decreasing num_speculative_tokens"
             )
 
+        control_vector_config = (
+            ControlVectorConfig(
+            max_control_vectors=self.max_control_vectors,
+            normalize=self.normalize_control_vector,
+            ) 
+            if self.enable_control_vector 
+            else None
+        )
+
+        control_vector_config = ControlVectorConfig(
+            max_control_vectors=self.max_control_vectors,
+            normalize=self.normalize_control_vector,
+        ) if self.enable_control_vector else None
+
         # bitsandbytes pre-quantized model need a specific model loader
         if model_config.quantization == "bitsandbytes":
             self.quantization = self.load_format = "bitsandbytes"
@@ -2156,6 +2191,7 @@ class EngineArgs:
             mamba_config=mamba_config,
             kernel_config=kernel_config,
             lora_config=lora_config,
+            control_vector_config=control_vector_config,
             speculative_config=speculative_config,
             structured_outputs_config=self.structured_outputs_config,
             observability_config=observability_config,

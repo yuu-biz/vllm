@@ -11,6 +11,7 @@ from typing_extensions import TypeVar
 
 import vllm.envs as envs
 from vllm.config import ParallelConfig, VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.distributed import stateless_destroy_torch_distributed_process_group
 from vllm.distributed.parallel_state import get_dp_group
 from vllm.engine.arg_utils import EngineArgs
@@ -404,6 +405,12 @@ class LLMEngine:
     def pin_lora(self, lora_id: int) -> bool:
         """Prevent an adapter from being evicted."""
         return self.engine_core.pin_lora(lora_id)
+
+    def add_control_vector(self, cv_request: ControlVectorRequest) -> bool:
+        """
+        Load a new ControlVector adapter into the engine for future requests.
+        """
+        return self.engine_core.add_control_vector(cv_request)
 
     def collective_rpc(
         self,

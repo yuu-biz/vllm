@@ -62,6 +62,7 @@ from vllm.inputs import (
 )
 from vllm.logger import init_logger
 from vllm.lora.request import LoRARequest
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.model_executor.layers.quantization import QuantizationMethods
 from vllm.outputs import (
     ClassificationRequestOutput,
@@ -450,6 +451,7 @@ class LLM:
         *,
         use_tqdm: bool | Callable[..., tqdm] = True,
         lora_request: Sequence[LoRARequest] | LoRARequest | None = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: list[int] | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
         mm_processor_kwargs: dict[str, Any] | None = None,
@@ -503,6 +505,7 @@ class LLM:
             output_type=RequestOutput,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             tokenization_kwargs=tokenization_kwargs,
             priority=priority,
             mm_processor_kwargs=mm_processor_kwargs,
@@ -1079,6 +1082,7 @@ class LLM:
         *,
         use_tqdm: bool | Callable[..., tqdm] = True,
         lora_request: list[LoRARequest] | LoRARequest | None = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         pooling_task: PoolingTask | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
     ) -> list[PoolingRequestOutput]:
@@ -1363,6 +1367,7 @@ class LLM:
         use_tqdm: bool | Callable[..., tqdm] = True,
         pooling_params: PoolingParams | None = None,
         lora_request: list[LoRARequest] | LoRARequest | None = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         tokenization_kwargs: dict[str, Any] | None = None,
         chat_template: str | None = None,
     ) -> list[ScoringRequestOutput]:
@@ -1792,6 +1797,7 @@ class LLM:
         params: Sequence[SamplingParams | PoolingParams],
         *,
         lora_requests: Sequence[LoRARequest | None] | None = None,
+        control_vector_request: ControlVectorRequest | None = None,
         priorities: Sequence[int] | None = None,
     ) -> list[str]:
         added_request_ids: list[str] = []
@@ -1804,6 +1810,7 @@ class LLM:
                     lora_request=self._resolve_mm_lora(
                         prompt,
                         None if lora_requests is None else lora_requests[i],
+                    control_vector_request=control_vector_request,
                     ),
                     priority=0 if priorities is None else priorities[i],
                 )
@@ -1820,6 +1827,7 @@ class LLM:
         prompt: EngineInput,
         params: SamplingParams | PoolingParams,
         lora_request: LoRARequest | None = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> str:
         if isinstance(params, SamplingParams):

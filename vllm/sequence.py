@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import torch
-
+from vllm.control_vectors.request import ControlVectorRequest
 if TYPE_CHECKING:
     from vllm.v1.worker.kv_connector_model_runner_mixin import KVConnectorOutput
 else:

@@ -18,6 +18,7 @@ from vllm.distributed.weight_transfer.base import (
     WeightTransferInitRequest,
     WeightTransferUpdateRequest,
 )
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.protocol import EngineClient, StreamingInput
 from vllm.entrypoints.serve.elastic_ep.middleware import set_scaling_elastic_ep
@@ -287,6 +288,7 @@ class AsyncLLM(EngineClient):
         params: SamplingParams | PoolingParams,
         arrival_time: float | None = None,
         lora_request: LoRARequest | None = None,
+        control_vector_request: ControlVectorRequest | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
         trace_headers: Mapping[str, str] | None = None,
         priority: int = 0,
@@ -353,6 +355,7 @@ class AsyncLLM(EngineClient):
                 supported_tasks=await self.get_supported_tasks(),
                 arrival_time=arrival_time,
                 lora_request=lora_request,
+                control_vector_request,
                 tokenization_kwargs=tokenization_kwargs,
                 trace_headers=trace_headers,
                 priority=priority,
@@ -532,6 +535,7 @@ class AsyncLLM(EngineClient):
         *,
         prompt_text: str | None = None,
         lora_request: LoRARequest | None = None,
+        control_vector_request: ControlVectorRequest | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
         trace_headers: Mapping[str, str] | None = None,
         priority: int = 0,
@@ -561,6 +565,7 @@ class AsyncLLM(EngineClient):
                 prompt,
                 sampling_params,
                 lora_request=lora_request,
+                control_vector_request=control_vector_request,
                 tokenization_kwargs=tokenization_kwargs,
                 trace_headers=trace_headers,
                 priority=priority,
@@ -777,6 +782,7 @@ class AsyncLLM(EngineClient):
         pooling_params: PoolingParams,
         request_id: str,
         lora_request: LoRARequest | None = None,
+        control_vector_request: ControlVectorRequest | None = None,
         trace_headers: Mapping[str, str] | None = None,
         priority: int = 0,
         tokenization_kwargs: dict[str, Any] | None = None,
@@ -803,6 +809,7 @@ class AsyncLLM(EngineClient):
                 prompt,
                 pooling_params,
                 lora_request=lora_request,
+                control_vector_request=control_vector_request,
                 tokenization_kwargs=tokenization_kwargs,
                 trace_headers=trace_headers,
                 priority=priority,
@@ -929,6 +936,14 @@ class AsyncLLM(EngineClient):
     async def pin_lora(self, lora_id: int) -> bool:
         """Prevent an adapter from being evicted."""
         return await self.engine_core.pin_lora_async(lora_id)
+
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        """
+        Load a new ControlVector adapter into the engine for future requests.
+        """
+        return await self.engine_core.add_control_vector_async(
+            control_vector_request)
 
     async def collective_rpc(
         self,

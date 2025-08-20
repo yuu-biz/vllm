@@ -16,3 +16,10 @@ class LoRAModulePath:
     name: str
     path: str
     base_model_name: str | None = None
+
+@dataclass
+class ControlVectorPath:
+    name: str
+    path: str
+    scale_factor: float
+    base_model_name: str | None = None

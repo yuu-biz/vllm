@@ -262,9 +262,12 @@ class OpenAIServingChat(OpenAIServing):
         if raw_request:
             raw_request.state.request_metadata = request_metadata
 
-        lora_request = self._maybe_get_adapters(request, supports_default_mm_loras=True)
+        (
+            lora_request, 
+            control_vector_request
+        ) = self._maybe_get_adapters(request, supports_default_mm_loras=True)
 
-        model_name = self.models.model_name(lora_request)
+        model_name = self.models.model_name(lora_request, control_vector_request)
 
         # Extract data_parallel_rank from header (router can inject it)
         data_parallel_rank = self._get_data_parallel_rank(raw_request)
@@ -308,6 +311,7 @@ class OpenAIServingChat(OpenAIServing):
                 engine_input,
                 params=sampling_params,
                 lora_request=lora_request,
+                control_vector_request=control_vector_request,
             )
 
             trace_headers = (
@@ -344,6 +348,7 @@ class OpenAIServingChat(OpenAIServing):
                     sampling_params,
                     sub_request_id,
                     lora_request=lora_request,
+                    control_vector_request=control_vector_request,
                     trace_headers=trace_headers,
                     priority=request.priority,
                     data_parallel_rank=data_parallel_rank,

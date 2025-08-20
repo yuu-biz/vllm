@@ -63,7 +63,8 @@ class OpenAIServingTokenization(OpenAIServing):
 
         request_id = f"tokenize-{self._base_request_id(raw_request)}"
 
-        lora_request = self._maybe_get_adapters(request)
+        (lora_request,
+             control_vector_request) = self._maybe_get_adapters(request)
 
         if isinstance(request, TokenizeChatRequest):
             tool_dicts = (
@@ -103,6 +104,7 @@ class OpenAIServingTokenization(OpenAIServing):
                 engine_input,
                 params=None,
                 lora_request=lora_request,
+                control_vector_request=control_vector_request,
             )
 
             prompt_components = self._extract_prompt_components(engine_input)
@@ -132,13 +134,15 @@ class OpenAIServingTokenization(OpenAIServing):
 
         request_id = f"tokenize-{self._base_request_id(raw_request)}"
 
-        lora_request = self._maybe_get_adapters(request)
+        (lora_request,
+         control_vector_request) = self._maybe_get_adapters(request)
 
         self._log_inputs(
             request_id,
             tokens_input(request.tokens),
             params=None,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
         )
 
         tok_prompt = await self.renderer.tokenize_prompt_async(

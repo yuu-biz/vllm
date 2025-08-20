@@ -8,6 +8,7 @@ from typing import cast
 import numpy as np
 import torch
 
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.config.reasoning import ReasoningConfig
 from vllm.lora.request import LoRARequest
 from vllm.multimodal.inputs import MultiModalFeatureSpec
@@ -48,6 +49,7 @@ class CachedRequestState:
     xdrope_positions: torch.Tensor | None = None
 
     lora_request: LoRARequest | None = None
+    control_vector_request: ControlVectorRequest | None = None
     prompt_embeds: torch.Tensor | None = None
     # To accumulate prompt logprobs tensor chunks across prefill steps.
     in_progress_prompt_logprobs_cpu: LogprobsTensors | None = None
@@ -245,6 +247,13 @@ class InputBatch:
         self.request_lora_mapping = np.zeros((self.max_num_reqs,), dtype=np.int64)
         self.lora_id_to_request_ids: dict[int, set[str]] = {}
         self.lora_id_to_lora_request: dict[int, LoRARequest] = {}
+
+        # control_vector related
+        self.request_control_vector_mapping = np.zeros((self.max_num_reqs, ),
+                                                       dtype=np.int32)
+        self.control_vector_id_to_request_ids: dict[int, set[str]] = {}
+        self.control_vector_id_to_control_vector_request: dict[
+            int, ControlVectorRequest] = {}
 
         # req_index -> generator
         # NOTE(woosuk): The indices of the requests that do not have their own
@@ -478,6 +487,22 @@ class InputBatch:
             # No LoRA
             self.request_lora_mapping[req_index] = 0
 
+        # Add request control_vector ID
+        if request.control_vector_request:
+            control_vector_id = request.control_vector_request.control_vector_id
+            if control_vector_id not in self.control_vector_id_to_request_ids:
+                self.control_vector_id_to_request_ids[control_vector_id] = set(
+                )
+
+            self.request_control_vector_mapping[req_index] = control_vector_id
+            self.control_vector_id_to_request_ids[control_vector_id].add(
+                request.req_id)
+            self.control_vector_id_to_control_vector_request[
+                control_vector_id] = request.control_vector_request
+        else:
+            # No ControlVector
+            self.request_control_vector_mapping[req_index] = 0
+
         return req_index
 
     def update_req_spec_token_ids(
@@ -536,6 +561,17 @@ class InputBatch:
                 del self.lora_id_to_request_ids[lora_id]
                 del self.lora_id_to_lora_request[lora_id]
             self.request_lora_mapping[req_index] = 0
+
+        # ControlVector
+        control_vector_id = self.request_control_vector_mapping[req_index]
+        if control_vector_id != 0:
+            control_vector_req_ids = self.control_vector_id_to_request_ids[control_vector_id]
+            control_vector_req_ids.discard(req_id)
+            if not control_vector_req_ids:
+                del self.control_vector_id_to_request_ids[control_vector_id]
+                del self.control_vector_id_to_control_vector_request[
+                    control_vector_id]
+            self.request_control_vector_mapping[req_index] = 0
 
         if self.is_pooling_model:
             self.pooling_params.pop(req_id, None)
@@ -631,6 +667,16 @@ class InputBatch:
             self.request_lora_mapping[i2],
             self.request_lora_mapping[i1],
         )
+
+        self.request_control_vector_mapping[i1],
+        self.request_control_vector_mapping[i2] =\
+            self.request_control_vector_mapping[i2],
+        self.request_control_vector_mapping[i1]
+
+        self.request_control_vector_mapping[i1],
+        self.request_control_vector_mapping[i2] =\
+            self.request_control_vector_mapping[i2],
+        self.request_control_vector_mapping[i1]
 
         if self.is_pooling_model:
             # Sampling and logits parameters don't apply to pooling models.
@@ -757,7 +803,11 @@ class InputBatch:
             self.block_table.move_row(last_req_index, empty_index)
 
             self.request_lora_mapping[empty_index] = self.request_lora_mapping[
-                last_req_index
+                last_req_index]
+
+            self.request_control_vector_mapping[
+                empty_index] = self.request_control_vector_mapping[
+                    last_req_index
             ]
 
             if self.is_pooling_model:
@@ -997,6 +1047,12 @@ class InputBatch:
         )
 
         return prompt_lora_mapping, token_lora_mapping, active_lora_requests
+
+    def make_control_vector_inputs(self):
+        active_control_vector_requests: set[ControlVectorRequest] = set(
+            self.control_vector_id_to_control_vector_request.values())
+
+        return active_control_vector_requests
 
     def set_async_sampled_token_ids(
         self,

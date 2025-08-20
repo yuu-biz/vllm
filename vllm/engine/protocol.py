@@ -13,6 +13,7 @@ from vllm.distributed.weight_transfer.base import (
 )
 from vllm.inputs import EngineInput, PromptType
 from vllm.lora.request import LoRARequest
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.outputs import PoolingRequestOutput, RequestOutput
 from vllm.pooling_params import PoolingParams
 from vllm.renderers import BaseRenderer
@@ -74,6 +75,7 @@ class EngineClient(ABC):
         prompt_text: str | None = None,
         lora_request: LoRARequest | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Mapping[str, str] | None = None,
         priority: int = 0,
         data_parallel_rank: int | None = None,
@@ -164,6 +166,14 @@ class EngineClient(ABC):
     @abstractmethod
     async def add_lora(self, lora_request: LoRARequest) -> bool:
         """Load a new LoRA adapter into the engine for future requests."""
+        ...
+
+    @abstractmethod
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> None:
+        """
+        Load a new ControlVector adapter into the engine for future requests.
+        """
         ...
 
     @abstractmethod

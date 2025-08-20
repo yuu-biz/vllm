@@ -11,6 +11,7 @@ import msgspec
 import numpy as np
 import torch
 
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.lora.request import LoRARequest
 from vllm.multimodal.inputs import MultiModalFeatureSpec
 from vllm.pooling_params import PoolingParams
@@ -90,6 +91,7 @@ class EngineCoreRequest(
     pooling_params: PoolingParams | None
     arrival_time: float
     lora_request: LoRARequest | None
+    control_vector_request: ControlVectorRequest | None
     cache_salt: str | None
     data_parallel_rank: int | None
     prompt_embeds: torch.Tensor | None = None

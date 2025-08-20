@@ -378,6 +378,7 @@ async def init_app_state(
         engine_client=engine_client,
         base_model_paths=base_model_paths,
         lora_modules=lora_modules,
+        control_vectors=args.control_vectors,
     )
     await state.openai_serving_models.init_static_loras()
 
@@ -397,6 +398,7 @@ async def init_app_state(
         log_error_stack=args.log_error_stack,
     )
 
+    await state.openai_serving_models.init_static_control_vectors()
     state.openai_serving_tokenization = OpenAIServingTokenization(
         engine_client,
         state.openai_serving_models,

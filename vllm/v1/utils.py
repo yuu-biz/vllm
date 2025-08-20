@@ -402,6 +402,7 @@ def report_usage_stats(
             "kv_cache_dtype": str(vllm_config.cache_config.cache_dtype),
             # Feature flags
             "enable_lora": bool(vllm_config.lora_config),
+            "enable_control_vector": bool(vllm_config.control_vector_config),
             "enable_prefix_caching": vllm_config.cache_config.enable_prefix_caching,
             "enforce_eager": vllm_config.model_config.enforce_eager,
             "disable_custom_all_reduce": parallel_config.disable_custom_all_reduce,
