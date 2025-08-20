@@ -19,6 +19,7 @@ import vllm.envs as envs
 from vllm.config import (DecodingConfig, LoRAConfig, ModelConfig,
                          ObservabilityConfig, ParallelConfig, SchedulerConfig,
                          VllmConfig)
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.core.scheduler import ScheduledSequenceGroup, SchedulerOutputs
 from vllm.engine.arg_utils import EngineArgs
 from vllm.engine.metrics_types import StatLoggerBase, Stats
@@ -208,6 +209,7 @@ class LLMEngine:
         self.model_config = vllm_config.model_config
         self.cache_config = vllm_config.cache_config
         self.lora_config = vllm_config.lora_config
+        self.control_vector_config = vllm_config.control_vector_config
         self.parallel_config = vllm_config.parallel_config
         self.scheduler_config = vllm_config.scheduler_config
         self.device_config = vllm_config.device_config
@@ -541,6 +543,7 @@ class LLMEngine:
         params: SamplingParams,
         arrival_time: float,
         lora_request: Optional[LoRARequest],
+        control_vector_request: Optional[ControlVectorRequest],
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
     ) -> Optional[SequenceGroup]:
@@ -555,6 +558,7 @@ class LLMEngine:
                 processed_inputs=processed_inputs,
                 arrival_time=arrival_time,
                 lora_request=lora_request,
+                control_vector_request=control_vector_request,
                 trace_headers=trace_headers,
                 priority=priority,
             )
@@ -582,6 +586,7 @@ class LLMEngine:
                 params,
                 arrival_time=arrival_time,
                 lora_request=lora_request,
+                control_vector_request=control_vector_request,
                 trace_headers=trace_headers,
                 encoder_seq=encoder_seq,
                 priority=priority)
@@ -608,6 +613,7 @@ class LLMEngine:
         params: SamplingParams,
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         tokenization_kwargs: Optional[dict[str, Any]] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
@@ -695,6 +701,7 @@ class LLMEngine:
             params=params,
             arrival_time=arrival_time,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             trace_headers=trace_headers,
             priority=priority,
         )
@@ -706,6 +713,7 @@ class LLMEngine:
         sampling_params: SamplingParams,
         arrival_time: float,
         lora_request: Optional[LoRARequest],
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         encoder_seq: Optional[Sequence] = None,
         priority: int = 0,
@@ -734,15 +742,17 @@ class LLMEngine:
         if self.vllm_config.speculative_config is not None:
             draft_size = \
                 self.vllm_config.speculative_config.num_speculative_tokens + 1
-        seq_group = SequenceGroup(request_id=request_id,
-                                  seqs=[seq],
-                                  arrival_time=arrival_time,
-                                  sampling_params=sampling_params,
-                                  lora_request=lora_request,
-                                  trace_headers=trace_headers,
-                                  encoder_seq=encoder_seq,
-                                  priority=priority,
-                                  draft_size=draft_size)
+        seq_group = SequenceGroup(
+            request_id=request_id,
+            seqs=[seq],
+            arrival_time=arrival_time,
+            sampling_params=sampling_params,
+            lora_request=lora_request,
+            control_vector_request=control_vector_request,
+            trace_headers=trace_headers,
+            encoder_seq=encoder_seq,
+            priority=priority,
+            draft_size=draft_size)
 
         return seq_group
 
@@ -1615,6 +1625,13 @@ class LLMEngine:
 
     def pin_lora(self, lora_id: int) -> bool:
         return self.model_executor.pin_lora(lora_id)
+
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        return self.model_executor.add_control_vector(control_vector_request)
+
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        return self.model_executor.remove_control_vector(control_vector_id)
 
     def start_profile(self) -> None:
         self.model_executor.start_profile()

@@ -62,7 +62,8 @@ class OpenAIServingTokenization(OpenAIServing):
         request_id = f"tokn-{self._base_request_id(raw_request)}"
 
         try:
-            lora_request = self._maybe_get_adapters(request)
+            (lora_request,
+             control_vector_request) = self._maybe_get_adapters(request)
 
             tokenizer = await self.engine_client.get_tokenizer(lora_request)
 
@@ -103,7 +104,8 @@ class OpenAIServingTokenization(OpenAIServing):
             self._log_inputs(request_id,
                              request_prompts[i],
                              params=None,
-                             lora_request=lora_request)
+                             lora_request=lora_request,
+                             control_vector_request=control_vector_request)
 
             if isinstance(engine_prompt,
                           dict) and "prompt_token_ids" in engine_prompt:
@@ -129,14 +131,16 @@ class OpenAIServingTokenization(OpenAIServing):
 
         request_id = f"tokn-{self._base_request_id(raw_request)}"
 
-        lora_request = self._maybe_get_adapters(request)
+        (lora_request,
+         control_vector_request) = self._maybe_get_adapters(request)
 
         tokenizer = await self.engine_client.get_tokenizer(lora_request)
 
         self._log_inputs(request_id,
                          request.tokens,
                          params=None,
-                         lora_request=lora_request)
+                         lora_request=lora_request,
+                         control_vector_request=control_vector_request)
 
         prompt_input = await self._tokenize_prompt_input_async(
             request,

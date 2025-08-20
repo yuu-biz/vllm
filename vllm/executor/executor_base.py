@@ -13,6 +13,7 @@ from typing_extensions import TypeVar
 
 import vllm.platforms
 from vllm.config import VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.logger import init_logger
 from vllm.lora.request import LoRARequest
 from vllm.model_executor.layers.sampler import SamplerOutput
@@ -45,6 +46,7 @@ class ExecutorBase(ABC):
         self.model_config = vllm_config.model_config
         self.cache_config = vllm_config.cache_config
         self.lora_config = vllm_config.lora_config
+        self.control_vector_config = vllm_config.control_vector_config
         self.load_config = vllm_config.load_config
         self.parallel_config = vllm_config.parallel_config
         self.scheduler_config = vllm_config.scheduler_config
@@ -169,6 +171,21 @@ class ExecutorBase(ABC):
         for s in sets:
             assert s == sets[0], "All workers should have the same LORAs."
         return sets[0]
+
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        assert control_vector_request.adapter_id > 0, \
+            "control vector's adapter_id must be greater than 0."
+        return all(
+            self.collective_rpc("add_control_vector",
+                                args=(control_vector_request, )))
+
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        assert control_vector_id > 0, \
+            "control_vector_id must be greater than 0."
+        return all(
+            self.collective_rpc("remove_control_vector",
+                                args=(control_vector_id, )))
 
     def start_profile(self) -> None:
         self.collective_rpc("start_profile")

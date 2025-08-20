@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 import msgspec
 import torch
 
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.inputs import SingletonInputs
 from vllm.logprobs import Logprob, PromptLogprobs, SampleLogprobs
 from vllm.multimodal import MultiModalKwargs, MultiModalPlaceholderDict
@@ -681,6 +682,7 @@ class SequenceGroup:
                  arrival_time: float,
                  sampling_params: Optional[SamplingParams] = None,
                  lora_request: Optional[LoRARequest] = None,
+                 control_vector_request: Optional[ControlVectorRequest] = None,
                  pooling_params: Optional[PoolingParams] = None,
                  pooled_data: Optional[torch.Tensor] = None,
                  encoder_seq: Optional[Sequence] = None,
@@ -702,6 +704,7 @@ class SequenceGroup:
                                       time_in_queue=None)
         self.last_token_latency = 0.0
         self.lora_request = lora_request
+        self.control_vector_request = control_vector_request
         self.prompt_logprobs: Optional[PromptLogprobs] = None
         self.state = SequenceGroupState()
         self.pooling_params = pooling_params
@@ -911,6 +914,7 @@ class SequenceGroupMetadata(
             query tokens for prefill, we don't need sampling.
         pooling_params: Pooling parameters.
         lora_request: LoRA request.
+        control_vector_request: Contorol Vector request.
         computed_block_nums: The block numbers that are already computed,
             used in prefix caching.
         state: Internal state tied to this sequence group.
@@ -936,6 +940,7 @@ class SequenceGroupMetadata(
     do_sample: bool = True
     pooling_params: Optional[PoolingParams] = None
     lora_request: Optional[LoRARequest] = None
+    control_vector_request: Optional[ControlVectorRequest] = None
     computed_block_nums: Optional[list[int]] = None
     state: Optional[SequenceGroupState] = msgspec.field(
         default_factory=lambda: SequenceGroupState())
@@ -963,6 +968,11 @@ class SequenceGroupMetadata(
     @property
     def lora_int_id(self) -> int:
         return self.lora_request.lora_int_id if self.lora_request else 0
+
+    @property
+    def control_vector_id(self) -> int:
+        return self.control_vector_request.adapter_id \
+            if self.control_vector_request else 0
 
     # Multi-Step Chunked-Prefill property
     @property
@@ -1418,6 +1428,7 @@ class ParallelSampleSequenceGroup(SequenceGroupBase):
             arrival_time=seq_group.arrival_time,
             sampling_params=original_params,
             lora_request=seq_group.lora_request,
+            control_vector_request=seq_group.control_vector_request,
             pooling_params=seq_group.pooling_params,
             pooled_data=seq_group.pooled_data,
             encoder_seq=seq_group.encoder_seq,

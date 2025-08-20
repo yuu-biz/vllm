@@ -18,10 +18,12 @@ from vllm.engine.multiprocessing import (ENGINE_DEAD_ERROR, IPC_DATA_EXT,
                                          IPC_HEALTH_EXT, IPC_INPUT_EXT,
                                          IPC_OUTPUT_EXT, REQUEST_OUTPUTS_T,
                                          VLLM_RPC_SUCCESS_STR, RPCAbortRequest,
-                                         RPCAdapterLoadedResponse, RPCError,
-                                         RPCIsSleepingRequest,
+                                         RPCAdapterLoadedResponse,
+                                         RPCControlVectorLoadedResponse,
+                                         RPCError, RPCIsSleepingRequest,
                                          RPCIsSleepingResponse,
                                          RPCLoadAdapterRequest,
+                                         RPCLoadControlVectorRequest,
                                          RPCProcessRequest,
                                          RPCResetMultiModalCacheRequest,
                                          RPCResetPrefixCacheRequest,
@@ -285,6 +287,8 @@ class MQLLMEngine:
                         self.stop_profile()
                 elif isinstance(request, RPCLoadAdapterRequest):
                     self._handle_load_adapter_request(request)
+                elif isinstance(request, RPCLoadControlVectorRequest):
+                    self._handle_load_control_vector_request(request)
                 elif isinstance(request, RPCResetMultiModalCacheRequest):
                     self.reset_mm_cache()
                 elif isinstance(request, RPCResetPrefixCacheRequest):
@@ -315,12 +319,14 @@ class MQLLMEngine:
             self._send_outputs(rpc_err)
 
         try:
-            self.engine.add_request(request_id=request_id,
-                                    prompt=request.prompt,
-                                    params=request.params,
-                                    lora_request=request.lora_request,
-                                    trace_headers=request.trace_headers,
-                                    priority=request.priority)
+            self.engine.add_request(
+                request_id=request_id,
+                prompt=request.prompt,
+                params=request.params,
+                lora_request=request.lora_request,
+                control_vector_request=request.control_vector_request,
+                trace_headers=request.trace_headers,
+                priority=request.priority)
 
             if self.log_requests:
                 logger.info("Added request %s.", request.request_id)
@@ -365,6 +371,23 @@ class MQLLMEngine:
         self._send_outputs(
             RPCIsSleepingResponse(request_id=request.request_id,
                                   is_sleeping=is_sleeping))
+
+    def _handle_load_control_vector_request(
+            self, request: RPCLoadControlVectorRequest):
+        try:
+            self.engine.add_control_vector(request.control_vector_request)
+        except BaseException as e:
+            # Send back an error if the adater fails to load
+            rpc_err = RPCError(
+                request_id=request.request_id,
+                is_engine_errored=False,
+                exception=e,
+            )
+            self._send_outputs(rpc_err)
+            return
+        # Otherwise, send back the successful load message
+        self._send_outputs(
+            RPCControlVectorLoadedResponse(request_id=request.request_id))
 
     def _health_check(self):
         # Send unhealthy if engine has already errored

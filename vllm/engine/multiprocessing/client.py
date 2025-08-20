@@ -17,6 +17,7 @@ from zmq.asyncio import Socket
 
 from vllm import PoolingParams
 from vllm.config import DecodingConfig, ModelConfig, VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.core.scheduler import SchedulerOutputs
 # yapf conflicts with isort for this block
 # yapf: disable
@@ -24,10 +25,12 @@ from vllm.engine.multiprocessing import (ENGINE_DEAD_ERROR, IPC_DATA_EXT,
                                          IPC_HEALTH_EXT, IPC_INPUT_EXT,
                                          IPC_OUTPUT_EXT, RPC_REQUEST_T,
                                          VLLM_RPC_SUCCESS_STR, RPCAbortRequest,
-                                         RPCAdapterLoadedResponse, RPCError,
-                                         RPCIsSleepingRequest,
+                                         RPCAdapterLoadedResponse,
+                                         RPCControlVectorLoadedResponse,
+                                         RPCError, RPCIsSleepingRequest,
                                          RPCIsSleepingResponse,
                                          RPCLoadAdapterRequest,
+                                         RPCLoadControlVectorRequest,
                                          RPCProcessRequest,
                                          RPCResetMultiModalCacheRequest,
                                          RPCResetPrefixCacheRequest,
@@ -251,9 +254,11 @@ class MQLLMEngineClient(EngineClient):
                         if queue is not None:
                             queue.put_nowait(exception)
                 # Put each output into the appropriate queue.
-                elif isinstance(
-                        request_outputs,
-                    (RPCAdapterLoadedResponse, RPCIsSleepingResponse)):
+                elif isinstance(request_outputs, (
+                        RPCAdapterLoadedResponse,
+                        RPCControlVectorLoadedResponse,
+                        RPCIsSleepingResponse,
+                )):
                     self._add_output(request_outputs)
                 else:
                     for request_output in request_outputs:
@@ -264,6 +269,7 @@ class MQLLMEngineClient(EngineClient):
 
     def _add_output(self, request_output: Union[RequestOutput,
                                                 RPCAdapterLoadedResponse,
+                                                RPCControlVectorLoadedResponse,
                                                 RPCIsSleepingResponse]):
         queue = self.output_queues.get(request_output.request_id)
         if queue is not None:
@@ -456,6 +462,7 @@ class MQLLMEngineClient(EngineClient):
         sampling_params: SamplingParams,
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
     ) -> AsyncGenerator[RequestOutput, None]:
@@ -472,13 +479,16 @@ class MQLLMEngineClient(EngineClient):
             sampling_params: The sampling parameters of the request.
             request_id: The unique id of the request.
             lora_request: LoRA request to use for generation, if any.
+            control_vector_request: ControlVector request to use
+                                            for generation, if any.
             trace_headers: OpenTelemetry trace headers.
             priority: Priority of the request (lower means earlier handling).
                 Any priority other than 0 will lead to an error if the
                 scheduling policy is not "priority".
         """
         return self._process_request(prompt, sampling_params, request_id,
-                                     lora_request, trace_headers, priority)
+                                     lora_request, control_vector_request,
+                                     trace_headers, priority)
 
     def encode(
         self,
@@ -499,6 +509,7 @@ class MQLLMEngineClient(EngineClient):
         params: SamplingParams,
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
     ) -> AsyncGenerator[RequestOutput, None]:
@@ -535,6 +546,7 @@ class MQLLMEngineClient(EngineClient):
                     params=params,
                     request_id=request_id,
                     lora_request=lora_request,
+                    control_vector_request=control_vector_request,
                     trace_headers=trace_headers,
                     priority=priority,
                 ))
@@ -641,3 +653,27 @@ class MQLLMEngineClient(EngineClient):
         if isinstance(request_output, BaseException):
             raise request_output
         return request_output.lora_loaded
+
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> None:
+        """
+        Load a new ControlVector adapter into the enginefor future requests.
+        """
+        # Uses the same I/O as generate requests
+        request = RPCLoadControlVectorRequest(control_vector_request)
+
+        # Create output queue for this requests.
+        queue: asyncio.Queue[Union[None, BaseException]] = asyncio.Queue()
+        self.output_queues[request.request_id] = queue
+
+        # Send the request
+        request_bytes = pickle.dumps(request)
+        await self.input_socket.send_multipart((request_bytes, ), copy=False)
+
+        # Wait for the response
+        request_output = await queue.get()
+        self.output_queues.pop(request.request_id)
+
+        # Raise on error, otherwise happily return None
+        if isinstance(request_output, BaseException):
+            raise request_output

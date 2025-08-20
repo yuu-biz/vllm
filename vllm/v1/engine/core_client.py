@@ -20,6 +20,7 @@ import zmq
 import zmq.asyncio
 
 from vllm.config import VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.logger import init_logger
 from vllm.lora.request import LoRARequest
 from vllm.tasks import SupportedTask
@@ -153,6 +154,9 @@ class EngineCoreClient(ABC):
     def pin_lora(self, lora_id: int) -> bool:
         raise NotImplementedError
 
+    def add_control_vector(self, cv_request: ControlVectorRequest) -> bool:
+        raise NotImplementedError
+
     def save_sharded_state(self,
                            path: str,
                            pattern: Optional[str] = None,
@@ -214,6 +218,10 @@ class EngineCoreClient(ABC):
         raise NotImplementedError
 
     async def pin_lora_async(self, lora_id: int) -> bool:
+        raise NotImplementedError
+
+    async def add_control_vector_async(
+            self, control_vector_request: ControlVectorRequest) -> bool:
         raise NotImplementedError
 
     async def save_sharded_state_async(self,
@@ -294,6 +302,9 @@ class InprocClient(EngineCoreClient):
 
     def pin_lora(self, lora_id: int) -> bool:
         return self.engine_core.pin_lora(lora_id)
+
+    def add_control_vector(self, cv_request: ControlVectorRequest) -> bool:
+        return self.engine_core.add_control_vector(cv_request)
 
     def save_sharded_state(self,
                            path: str,
@@ -727,6 +738,10 @@ class SyncMPClient(MPClient):
     def pin_lora(self, lora_id: int) -> bool:
         return self.call_utility("pin_lora", lora_id)
 
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        return self.call_utility("add_control_vector", control_vector_request)
+
     def sleep(self, level: int = 1) -> None:
         self.call_utility("sleep", level)
 
@@ -938,6 +953,11 @@ class AsyncMPClient(MPClient):
 
     async def pin_lora_async(self, lora_id: int) -> bool:
         return await self.call_utility_async("pin_lora", lora_id)
+
+    async def add_control_vector_async(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        return await self.call_utility_async("add_control_vector",
+                                             control_vector_request)
 
     async def save_sharded_state_async(self,
                                        path: str,

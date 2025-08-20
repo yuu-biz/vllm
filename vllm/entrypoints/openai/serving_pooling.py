@@ -97,7 +97,8 @@ class OpenAIServingPooling(OpenAIServing):
 
         is_io_processor_request = isinstance(request, IOProcessorRequest)
         try:
-            lora_request = self._maybe_get_adapters(request)
+            (lora_request,
+             control_vector_request) = self._maybe_get_adapters(request)
 
             if self.model_config.skip_tokenizer_init:
                 tokenizer = None
@@ -179,7 +180,8 @@ class OpenAIServingPooling(OpenAIServing):
                 self._log_inputs(request_id_item,
                                  request_prompts[i],
                                  params=pooling_params,
-                                 lora_request=lora_request)
+                                 lora_request=lora_request,
+                                 control_vector_request=control_vector_request)
 
                 trace_headers = (None if raw_request is None else await
                                  self._get_trace_headers(raw_request.headers))

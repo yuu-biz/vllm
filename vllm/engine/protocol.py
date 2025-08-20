@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator, Iterable, Mapping, Optional, Union
 
 from vllm.beam_search import BeamSearchSequence, create_sort_beams_key_function
 from vllm.config import DecodingConfig, ModelConfig, VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.core.scheduler import SchedulerOutputs
 from vllm.inputs.data import PromptType, TokensPrompt
 from vllm.inputs.parse import is_explicit_encoder_decoder_prompt
@@ -54,6 +55,7 @@ class EngineClient(ABC):
         sampling_params: SamplingParams,
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
     ) -> AsyncGenerator[RequestOutput, None]:
@@ -327,6 +329,14 @@ class EngineClient(ABC):
     @abstractmethod
     async def add_lora(self, lora_request: LoRARequest) -> bool:
         """Load a new LoRA adapter into the engine for future requests."""
+        ...
+
+    @abstractmethod
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> None:
+        """
+        Load a new ControlVector adapter into the engine for future requests.
+        """
         ...
 
     async def scale_elastic_ep(self,

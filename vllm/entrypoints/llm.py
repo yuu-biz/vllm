@@ -17,6 +17,7 @@ from vllm.beam_search import (BeamSearchInstance, BeamSearchOutput,
                               create_sort_beams_key_function)
 from vllm.config import (CompilationConfig, ModelDType, TokenizerMode,
                          is_init_field)
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.arg_utils import (ConvertOption, EngineArgs, HfOverrides,
                                    PoolerConfig, RunnerOption)
 from vllm.engine.llm_engine import LLMEngine
@@ -325,6 +326,7 @@ class LLM:
         *,
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         lora_request: Optional[Union[list[LoRARequest], LoRARequest]] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: Optional[list[int]] = None,
     ) -> list[RequestOutput]:
         """Generates the completions for the input prompts.
@@ -380,6 +382,7 @@ class LLM:
             params=sampling_params,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             priority=priority,
         )
 
@@ -847,6 +850,7 @@ class LLM:
         truncate_prompt_tokens: Optional[int] = None,
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         lora_request: Optional[Union[list[LoRARequest], LoRARequest]] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         pooling_task: PoolingTask = "encode",
         tokenization_kwargs: Optional[dict[str, Any]] = None,
     ) -> list[PoolingRequestOutput]:
@@ -943,6 +947,7 @@ class LLM:
             params=pooling_params,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
+            control_vector_request=control_vector_request
         )
 
         outputs = self._run_engine(use_tqdm=use_tqdm)
@@ -1196,6 +1201,7 @@ class LLM:
             params=pooling_params_list,
             use_tqdm=use_tqdm,
             lora_request=lora_request,
+            control_vector_request=None,
         )
 
         outputs = self._run_engine(use_tqdm=use_tqdm)
@@ -1216,6 +1222,7 @@ class LLM:
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         pooling_params: Optional[PoolingParams] = None,
         lora_request: Optional[Union[list[LoRARequest], LoRARequest]] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
     ) -> list[ScoringRequestOutput]:
         """Generate similarity scores for all pairs `<text,text_pair>` or
           `<multi-modal data, multi-modal data pair>`.
@@ -1410,6 +1417,7 @@ class LLM:
         *,
         use_tqdm: Union[bool, Callable[..., tqdm]] = True,
         lora_request: Optional[Union[Sequence[LoRARequest], LoRARequest]],
+        control_vector_request: Optional[ControlVectorRequest],
         priority: Optional[list[int]] = None,
     ) -> None:
         if isinstance(prompts, (str, dict)):
@@ -1453,6 +1461,7 @@ class LLM:
                 tokenization_kwargs=tokenization_kwargs,
                 lora_request=lora_request[i] if isinstance(
                     lora_request, Sequence) else lora_request,
+                control_vector_request=control_vector_request,
                 priority=priority[i] if priority else 0,
             )
 
@@ -1462,6 +1471,7 @@ class LLM:
         params: Union[SamplingParams, PoolingParams],
         tokenization_kwargs: Optional[dict[str, Any]] = None,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         priority: int = 0,
     ) -> None:
         request_id = str(next(self.request_counter))
@@ -1470,6 +1480,7 @@ class LLM:
             prompt,
             params,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             tokenization_kwargs=tokenization_kwargs,
             priority=priority,
         )

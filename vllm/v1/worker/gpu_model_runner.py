@@ -78,6 +78,8 @@ from vllm.v1.spec_decode.medusa import MedusaProposer
 from vllm.v1.spec_decode.metadata import SpecDecodeMetadata
 from vllm.v1.spec_decode.ngram_proposer import NgramProposer
 from vllm.v1.utils import CpuGpuBuffer
+from vllm.v1.worker.control_vector_model_runner_mixin import (
+    ControlVectorModelRunnerMixin)
 from vllm.v1.worker.gpu_input_batch import CachedRequestState, InputBatch
 from vllm.v1.worker.kv_connector_model_runner_mixin import (
     KVConnectorModelRunnerMixin, KVConnectorOutput)
@@ -103,7 +105,8 @@ else:
 logger = init_logger(__name__)
 
 
-class GPUModelRunner(LoRAModelRunnerMixin, KVConnectorModelRunnerMixin):
+class GPUModelRunner(LoRAModelRunnerMixin, ControlVectorModelRunnerMixin,
+                     KVConnectorModelRunnerMixin):
 
     def __init__(
         self,
@@ -115,6 +118,7 @@ class GPUModelRunner(LoRAModelRunnerMixin, KVConnectorModelRunnerMixin):
         self.cache_config = vllm_config.cache_config
         self.compilation_config = vllm_config.compilation_config
         self.lora_config = vllm_config.lora_config
+        self.control_vector_config = vllm_config.control_vector_config
         self.load_config = vllm_config.load_config
         self.parallel_config = vllm_config.parallel_config
         self.scheduler_config = vllm_config.scheduler_config
@@ -477,7 +481,7 @@ class GPUModelRunner(LoRAModelRunnerMixin, KVConnectorModelRunnerMixin):
                 num_computed_tokens=new_req_data.num_computed_tokens,
                 output_token_ids=[],
                 lora_request=new_req_data.lora_request,
-            )
+                control_vector_request=new_req_data.control_vector_request)
             self.requests[req_id] = req_state
 
             # Only relevant for models using M-RoPE (e.g, Qwen2-VL)
@@ -872,6 +876,10 @@ class GPUModelRunner(LoRAModelRunnerMixin, KVConnectorModelRunnerMixin):
         # Hot-Swap lora model
         if self.lora_config:
             self.set_active_loras(self.input_batch, num_scheduled_tokens)
+
+        # Hot-Swap control_vector model
+        if self.control_vector_config:
+            self.set_active_control_vectors(self.input_batch)
 
         return (attn_metadata, logits_indices, spec_decode_metadata,
                 num_scheduled_tokens, spec_decode_common_attn_metadata,
@@ -1970,6 +1978,9 @@ class GPUModelRunner(LoRAModelRunnerMixin, KVConnectorModelRunnerMixin):
                                                   self.scheduler_config,
                                                   self.lora_config,
                                                   self.device)
+            if self.control_vector_config:
+                self.model = self.load_control_vector_model(
+                    self.model, self.control_vector_config, self.device)
             if hasattr(self, "drafter"):
                 logger.info("Loading drafter model...")
                 self.drafter.load_model(self.model)

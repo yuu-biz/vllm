@@ -12,6 +12,7 @@ from weakref import ReferenceType
 import vllm.envs as envs
 from vllm.config import (DecodingConfig, LoRAConfig, ModelConfig,
                          ParallelConfig, SchedulerConfig, VllmConfig)
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.core.scheduler import SchedulerOutputs
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_timeout import asyncio_timeout
@@ -402,6 +403,7 @@ class _AsyncLLMEngine(LLMEngine):
         params: SamplingParams,
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
         data_parallel_rank: Optional[int] = None,
@@ -414,6 +416,11 @@ class _AsyncLLMEngine(LLMEngine):
         if lora_request is not None and not self.lora_config:
             raise ValueError(f"Got lora_request {lora_request} but LoRA is "
                              "not enabled!")
+        if (control_vector_request is not None
+                and not self.control_vector_config):
+            raise ValueError(
+                f"Got control_vector_request {control_vector_request} but "
+                "control vector is not enabled!")
         if priority != 0 and not self.scheduler_config.policy == "priority":
             raise ValueError(f"Got priority {priority} but "
                              "Priority scheduling is not enabled.")
@@ -444,6 +451,7 @@ class _AsyncLLMEngine(LLMEngine):
             params=params,
             arrival_time=arrival_time,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             trace_headers=trace_headers,
             priority=priority,
         )
@@ -776,6 +784,7 @@ class AsyncLLMEngine(EngineClient):
         params: SamplingParams,
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
         data_parallel_rank: Optional[int] = None,
@@ -803,6 +812,7 @@ class AsyncLLMEngine(EngineClient):
             params=params,
             arrival_time=arrival_time or time.time(),
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             trace_headers=trace_headers,
             priority=priority,
             data_parallel_rank=data_parallel_rank,
@@ -817,6 +827,7 @@ class AsyncLLMEngine(EngineClient):
         sampling_params: SamplingParams,
         request_id: str,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
         data_parallel_rank: Optional[int] = None,
@@ -893,6 +904,7 @@ class AsyncLLMEngine(EngineClient):
                     prompt,
                     sampling_params,
                     lora_request=lora_request,
+                    control_vector_request=control_vector_request,
                     trace_headers=trace_headers,
                     priority=priority,
                     data_parallel_rank=data_parallel_rank,
@@ -1023,6 +1035,10 @@ class AsyncLLMEngine(EngineClient):
 
     async def add_lora(self, lora_request: LoRARequest) -> bool:
         return self.engine.add_lora(lora_request)
+
+    async def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> None:
+        self.engine.add_control_vector(control_vector_request)
 
     async def collective_rpc(self,
                              method: str,

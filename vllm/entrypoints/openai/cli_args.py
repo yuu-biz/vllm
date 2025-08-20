@@ -22,7 +22,8 @@ from vllm.entrypoints.chat_utils import (ChatTemplateContentFormatOption,
                                          validate_chat_template)
 from vllm.entrypoints.constants import (H11_MAX_HEADER_COUNT_DEFAULT,
                                         H11_MAX_INCOMPLETE_EVENT_SIZE_DEFAULT)
-from vllm.entrypoints.openai.serving_models import LoRAModulePath
+from vllm.entrypoints.openai.serving_models import (ControlVectorPath,
+                                                    LoRAModulePath)
 from vllm.entrypoints.openai.tool_parsers import ToolParserManager
 from vllm.logger import init_logger
 from vllm.utils import FlexibleArgumentParser
@@ -66,6 +67,41 @@ class LoRAParserAction(argparse.Action):
         setattr(namespace, self.dest, lora_list)
 
 
+class ControlVectorParserAction(argparse.Action):
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Optional[Union[str, Sequence[str]]],
+        option_string: Optional[str] = None,
+    ):
+        if values is None:
+            values = []
+        if isinstance(values, str):
+            raise TypeError("Expected values to be a list")
+
+        control_vector_list: list[ControlVectorPath] = []
+        for item in values:
+            if item in [None, '']:  # Skip if item is None or empty string
+                continue
+            if '=' in item and ',' not in item:  # Old format: name=path
+                parser.error(f"Invalid format for --control-vectors: {item}")
+            else:  # Assume JSON format
+                try:
+                    control_vector_dict = json.loads(item)
+                    control_vector = ControlVectorPath(**control_vector_dict)
+                    control_vector_list.append(control_vector)
+                except json.JSONDecodeError:
+                    parser.error(
+                        f"Invalid JSON format for --control-vectors: {item}")
+                except TypeError as e:
+                    parser.error(
+                        f"Invalid fields for --control-vectors: {item} - {str(e)}"  # noqa: E501
+                    )
+        setattr(namespace, self.dest, control_vector_list)
+
+
 @config
 @dataclass
 class FrontendArgs:
@@ -97,6 +133,11 @@ class FrontendArgs:
     or JSON list format. Example (old format): `'name=path'` Example (new
     format): `{\"name\": \"name\", \"path\": \"lora_path\",
     \"base_model_name\": \"id\"}`"""
+    control_vectors: Optional[list[ControlVectorPath]] = None
+    """ControlVector configurations in JSON format. Example (new format):
+    `{\"name\": \"name\", \"path\": \"control_vector_path\", 
+    \"scale_factor\": \"value\", \"base_model_name\": \"id\"}`
+    "Multiple vectors can be specified."""
     chat_template: Optional[str] = None
     """The file path to the chat template, or the template in single-line form
     for the specified model."""
@@ -203,6 +244,12 @@ schema. Example: `[{"type": "text", "text": "Hello world!"}]`"""
         # optional_type(str)
         frontend_kwargs["lora_modules"]["type"] = optional_type(str)
         frontend_kwargs["lora_modules"]["action"] = LoRAParserAction
+
+        # Special case: ControlVector modules need custom parser action and
+        # optional_type(str)
+        frontend_kwargs["control_vectors"]["type"] = optional_type(str)
+        frontend_kwargs["control_vectors"]["action"] = \
+            ControlVectorParserAction
 
         # Special case: Middleware needs append action
         frontend_kwargs["middleware"]["action"] = "append"

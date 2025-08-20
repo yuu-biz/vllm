@@ -125,7 +125,10 @@ class OpenAIServingCompletion(OpenAIServing):
             raw_request.state.request_metadata = request_metadata
 
         try:
-            lora_request = self._maybe_get_adapters(request)
+            (
+                lora_request,
+                control_vector_request,
+            ) = self._maybe_get_adapters(request)
 
             if self.model_config.skip_tokenizer_init:
                 tokenizer = None
@@ -201,6 +204,7 @@ class OpenAIServingCompletion(OpenAIServing):
                     request_prompts[i],
                     params=sampling_params,
                     lora_request=lora_request,
+                    control_vector_request=control_vector_request,
                 )
 
                 trace_headers = (None if raw_request is None else await
@@ -224,6 +228,7 @@ class OpenAIServingCompletion(OpenAIServing):
                         sampling_params,
                         request_id_item,
                         lora_request=lora_request,
+                        control_vector_request=control_vector_request,
                         trace_headers=trace_headers,
                         priority=request.priority,
                     )
@@ -235,7 +240,8 @@ class OpenAIServingCompletion(OpenAIServing):
 
         result_generator = merge_async_iterators(*generators)
 
-        model_name = self._get_model_name(request.model, lora_request)
+        model_name = self._get_model_name(request.model, lora_request,
+                                          control_vector_request)
         num_prompts = len(engine_prompts)
 
         # Similar to the OpenAI API, when n != best_of, we do not stream the

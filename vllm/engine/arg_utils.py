@@ -22,9 +22,9 @@ from typing_extensions import TypeIs, deprecated
 
 import vllm.envs as envs
 from vllm.config import (BlockSize, CacheConfig, CacheDType, CompilationConfig,
-                         ConfigFormat, ConfigType, ConvertOption,
-                         DecodingConfig, DetailedTraceModules, Device,
-                         DeviceConfig, DistributedExecutorBackend, EPLBConfig,
+                         ConfigFormat, ConfigType, ControlVectorConfig,
+                         ConvertOption, DecodingConfig, DetailedTraceModules,
+                         Device, DeviceConfig, DistributedExecutorBackend, EPLBConfig,
                          GuidedDecodingBackend, HfOverrides, KVEventsConfig,
                          KVTransferConfig, LoadConfig, LogprobsMode,
                          LoRAConfig, MambaDType, MMEncoderTPMode, ModelConfig,
@@ -377,6 +377,10 @@ class EngineArgs:
     max_cpu_loras: Optional[int] = LoRAConfig.max_cpu_loras
     lora_dtype: Optional[Union[str, torch.dtype]] = LoRAConfig.lora_dtype
     lora_extra_vocab_size: int = LoRAConfig.lora_extra_vocab_size
+    # ControlVector fields
+    enable_control_vector: bool = False
+    max_control_vectors: int = ControlVectorConfig.max_control_vectors
+    normalize_control_vector: bool = ControlVectorConfig.normalize
 
     ray_workers_use_nsight: bool = ParallelConfig.ray_workers_use_nsight
     num_gpu_blocks_override: Optional[
@@ -805,6 +809,22 @@ class EngineArgs:
                                 **lora_kwargs["fully_sharded_loras"])
         lora_group.add_argument("--default-mm-loras",
                                 **lora_kwargs["default_mm_loras"])
+
+        # ControlVector related configs
+        control_vector_kwargs = get_kwargs(ControlVectorConfig)
+        control_vector_group = parser.add_argument_group(
+            title="ControlVectorConfig",
+            description=ControlVectorConfig.__doc__,
+        )
+        control_vector_group.add_argument(
+            "--enable-control-vector",
+            action=argparse.BooleanOptionalAction,
+            help="If True, enable handling of ControlVectors.")
+        control_vector_group.add_argument(
+            "--max-control-vectors",
+            **control_vector_kwargs["max_control_vectors"])
+        control_vector_group.add_argument("--normalize-control-vector",
+                                          **control_vector_kwargs["normalize"])
 
         # Observability arguments
         observability_kwargs = get_kwargs(ObservabilityConfig)
@@ -1361,6 +1381,11 @@ class EngineArgs:
             max_cpu_loras=self.max_cpu_loras if self.max_cpu_loras
             and self.max_cpu_loras > 0 else None) if self.enable_lora else None
 
+        control_vector_config = ControlVectorConfig(
+            max_control_vectors=self.max_control_vectors,
+            normalize=self.normalize_control_vector,
+        ) if self.enable_control_vector else None
+
         # bitsandbytes pre-quantized model need a specific model loader
         if model_config.quantization == "bitsandbytes":
             self.quantization = self.load_format = "bitsandbytes"
@@ -1390,6 +1415,7 @@ class EngineArgs:
             scheduler_config=scheduler_config,
             device_config=device_config,
             lora_config=lora_config,
+            control_vector_config=control_vector_config,
             speculative_config=speculative_config,
             load_config=load_config,
             decoding_config=decoding_config,

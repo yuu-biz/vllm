@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     import numpy as np
     import numpy.typing as npt
 
+    from vllm.control_vectors.request import ControlVectorRequest
     from vllm.distributed.kv_transfer.kv_connector.v1.base import (
         KVConnectorMetadata)
     from vllm.lora.request import LoRARequest
@@ -32,6 +33,7 @@ class NewRequestData:
     block_ids: tuple[list[int], ...]
     num_computed_tokens: int
     lora_request: Optional[LoRARequest]
+    control_vector_request: Optional[ControlVectorRequest]
 
     @classmethod
     def from_request(
@@ -50,6 +52,7 @@ class NewRequestData:
             block_ids=block_ids,
             num_computed_tokens=request.num_computed_tokens,
             lora_request=request.lora_request,
+            control_vector_request=request.control_vector_request,
         )
 
     def __repr__(self):
@@ -62,7 +65,8 @@ class NewRequestData:
                 f"sampling_params={self.sampling_params},"
                 f"block_ids={self.block_ids},"
                 f"num_computed_tokens={self.num_computed_tokens},"
-                f"lora_request={self.lora_request}"
+                f"lora_request={self.lora_request}",
+                f"control_vector_request={self.control_vector_request}"
                 ")")
 
     # Version of __repr__ with the prompt data obfuscated
@@ -76,7 +80,8 @@ class NewRequestData:
                 f"sampling_params={self.sampling_params},"
                 f"block_ids={self.block_ids},"
                 f"num_computed_tokens={self.num_computed_tokens},"
-                f"lora_request={self.lora_request}"
+                f"lora_request={self.lora_request}",
+                f"control_vector_request={self.control_vector_request}"
                 ")")
 
 

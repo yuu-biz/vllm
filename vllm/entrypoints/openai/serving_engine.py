@@ -26,6 +26,7 @@ else:
 
 import vllm.envs as envs
 from vllm.config import ModelConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.protocol import EngineClient
 # yapf conflicts with isort for this block
 # yapf: disable
@@ -452,6 +453,11 @@ class OpenAIServing:
             if isinstance(load_result, ErrorResponse) and \
                 load_result.error.code == HTTPStatus.BAD_REQUEST.value:
                 error_response = load_result
+        if request.model in [
+                control_vector.control_vector_name
+                for control_vector in self.models.control_vector_requests
+        ]:
+            return None
 
         return error_response or self.create_error_response(
             message=f"The model `{request.model}` does not exist.",
@@ -486,20 +492,28 @@ class OpenAIServing:
         self,
         request: AnyRequest,
         supports_default_mm_loras: bool = False,
-    ) -> Optional[LoRARequest]:
+    ) -> Union[
+            tuple[None, None],
+            tuple[LoRARequest, None],
+            tuple[None, ControlVectorRequest],
+    ]:
 
         if request.model in self.models.lora_requests:
-            return self.models.lora_requests[request.model]
+            return self.models.lora_requests[request.model], None
+
+        for control_vector in self.models.control_vector_requests:
+            if request.model == control_vector.control_vector_name:
+                return None, control_vector
 
         # Currently only support default modality specific loras
         # if we have exactly one lora matched on the request.
         if supports_default_mm_loras:
             default_mm_lora = self._get_active_default_mm_loras(request)
             if default_mm_lora is not None:
-                return default_mm_lora
+                return default_mm_lora, None
 
         if self._is_model_supported(request.model):
-            return None
+            return None, None
 
         # if _check_model has been called earlier, this will be unreachable
         raise ValueError(f"The model `{request.model}` does not exist.")
@@ -1053,6 +1067,7 @@ class OpenAIServing:
         params: Optional[Union[SamplingParams, PoolingParams,
                                BeamSearchParams]],
         lora_request: Optional[LoRARequest],
+        control_vector_request: Optional[ControlVectorRequest],
     ) -> None:
         if self.request_logger is None:
             return
@@ -1074,6 +1089,7 @@ class OpenAIServing:
             prompt_embeds,
             params=params,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
         )
 
     async def _get_trace_headers(
@@ -1117,11 +1133,16 @@ class OpenAIServing:
             return True
         return self.models.is_base_model(model_name)
 
-    def _get_model_name(self,
-                        model_name: Optional[str] = None,
-                        lora_request: Optional[LoRARequest] = None) -> str:
+    def _get_model_name(
+            self,
+            model_name: Optional[str] = None,
+            lora_request: Optional[LoRARequest] = None,
+            control_vector_request: Optional[ControlVectorRequest] = None
+    ) -> str:
         if lora_request:
             return lora_request.lora_name
+        if control_vector_request is not None:
+            return control_vector_request.control_vector_name
         if not model_name:
             return self.models.base_model_paths[0].name
         return model_name

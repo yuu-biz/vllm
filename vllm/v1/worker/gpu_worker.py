@@ -13,6 +13,7 @@ import torch.nn as nn
 
 import vllm.envs as envs
 from vllm.config import VllmConfig
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.distributed import (ensure_model_parallel_initialized,
                               init_distributed_environment,
                               set_custom_all_reduce)
@@ -417,6 +418,10 @@ class Worker(WorkerBase):
 
     def pin_lora(self, lora_id: int) -> bool:
         return self.model_runner.pin_lora(lora_id)
+
+    def add_control_vector(
+            self, control_vector_request: ControlVectorRequest) -> bool:
+        return self.model_runner.add_control_vector(control_vector_request)
 
     def check_health(self) -> None:
         # worker will always be healthy as long as it's running.

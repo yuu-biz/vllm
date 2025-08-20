@@ -89,6 +89,7 @@ if TYPE_CHECKING:
     VLLM_TORCH_PROFILER_WITH_FLOPS: bool = False
     VLLM_USE_TRITON_AWQ: bool = False
     VLLM_ALLOW_RUNTIME_LORA_UPDATING: bool = False
+    VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING: bool = False
     VLLM_SKIP_P2P_CHECK: bool = False
     VLLM_DISABLED_KERNELS: list[str] = []
     VLLM_USE_V1: bool = True
@@ -711,6 +712,11 @@ environment_variables: dict[str, Callable[[], Any]] = {
     lambda:
     (os.environ.get("VLLM_ALLOW_RUNTIME_LORA_UPDATING", "0").strip().lower() in
      ("1", "true")),
+
+    # If set, allow loading or unloading control vector in runtime,
+    "VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING":
+    lambda: (os.environ.get("VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING", "0").
+             strip().lower() in ("1", "true")),
 
     # We assume drivers can report p2p status correctly.
     # If the program hangs when using custom allreduce,
