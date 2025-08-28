@@ -1313,7 +1313,7 @@ if envs.VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING:
         response = await handler.load_control_vector(request)
         if isinstance(response, ErrorResponse):
             return JSONResponse(content=response.model_dump(),
-                                status_code=response.code)
+                                status_code=response.error.code)
 
         return Response(status_code=200, content=response)
 
@@ -1324,7 +1324,7 @@ if envs.VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING:
         response = await handler.unload_control_vector(request)
         if isinstance(response, ErrorResponse):
             return JSONResponse(content=response.model_dump(),
-                                status_code=response.code)
+                                status_code=response.error.code)
 
         return Response(status_code=200, content=response)
 
