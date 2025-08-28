@@ -194,6 +194,7 @@ class LLMEngine:
         params: Union[SamplingParams, PoolingParams],
         arrival_time: Optional[float] = None,
         lora_request: Optional[LoRARequest] = None,
+        control_vector_request: Optional[ControlVectorRequest] = None,
         tokenization_kwargs: Optional[dict[str, Any]] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         priority: int = 0,
@@ -205,8 +206,9 @@ class LLMEngine:
 
         # Process raw inputs into the request.
         prompt_str, request = self.processor.process_inputs(
-            request_id, prompt, params, arrival_time, lora_request,
-            tokenization_kwargs, trace_headers, priority)
+            request_id, prompt, params, arrival_time, lora_request, 
+            control_vector_request, tokenization_kwargs, trace_headers, priority
+        )
 
         n = params.n if isinstance(params, SamplingParams) else 1
 
