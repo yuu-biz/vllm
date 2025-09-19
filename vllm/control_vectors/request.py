@@ -5,7 +5,7 @@ from typing import Optional
 
 import msgspec
 
-from vllm.adapter_commons.request import AdapterRequest
+
 
 
 class ControlVectorRequest(
@@ -23,7 +23,7 @@ class ControlVectorRequest(
     control_vector_id must be globally unique for a given adapter.
     This is currently not enforced in vLLM.
     """
-    __metaclass__ = AdapterRequest
+
 
     control_vector_name: str
     control_vector_id: int

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import logging
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Callable, Optional, TypeVar
 
 import gguf
 import numpy as np
@@ -9,18 +9,27 @@ import torch
 from huggingface_hub import hf_hub_download
 from torch import nn
 
-from vllm.adapter_commons.models import (AdapterLRUCache, AdapterModel,
-                                         AdapterModelManager)
-from vllm.adapter_commons.utils import (add_adapter, deactivate_adapter,
-                                        get_adapter, list_adapters,
-                                        remove_adapter, set_adapter_mapping)
-from vllm.config import ControlVectorConfig
+from vllm.config.control_vector import ControlVectorConfig
 from vllm.control_vectors.layers import (ControlVectorMapping,
                                          MLPWithControlVector)
 
 from vllm.model_executor.models.interfaces import supports_multimodal
+from vllm.utils import LRUCache
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+class AdapterLRUCache(LRUCache[int, T]):
+
+    def __init__(self, capacity: int, deactivate_fn: Callable[[int], object]):
+        super().__init__(capacity)
+        self.deactivate_fn = deactivate_fn
+
+    def _on_remove(self, key: int, value: Optional[T]):
+        logger.debug("Removing adapter int id: %d", key)
+        self.deactivate_fn(key)
+        return super()._on_remove(key, value)
 
 _GLOBAL_CONTROL_VECTOR_ID = 0
 
@@ -59,7 +68,7 @@ def load_control_vector_file(file_path, revision="main"):
         raise RuntimeError(f"An unexpected error occurred: {e}") from e
 
 
-class ControlVectorModel(AdapterModel):
+class ControlVectorModel:
 
     def __init__(self,
                  control_vector_id=None,
@@ -122,7 +131,7 @@ class ControlVectorModel(AdapterModel):
             raise e
 
 
-class ControlVectorModelManager(AdapterModelManager):
+class ControlVectorModelManager:
 
     def __init__(self, model: nn.Module,
                  control_vector_config: ControlVectorConfig):
@@ -236,26 +245,36 @@ class ControlVectorModelManager(AdapterModelManager):
         self._active_adapters.clear()
 
     def deactivate_adapter(self, adapter_id: int) -> bool:
-        return deactivate_adapter(adapter_id, self._active_adapters,
-                                  self._deactivate_adapter)
+        if adapter_id not in self._active_adapters:
+            return False
+        self._deactivate_adapter(adapter_id)
+        self._active_adapters.pop(adapter_id, None)
+        return True
 
     def add_adapter(self, adapter: ControlVectorModel) -> bool:
-        return add_adapter(adapter, self._registered_adapters, self.capacity,
-                           self._add_adapter)
+        if adapter.id in self._registered_adapters:
+            return False
+        if len(self._registered_adapters) >= self.capacity:
+            raise RuntimeError("No free adapter slots.")
+        self._add_adapter(adapter)
+        return True
 
     def set_adapter_mapping(self, mapping: ControlVectorMapping) -> None:
-        self._last_mapping = set_adapter_mapping(mapping, self._last_mapping,
-                                                 self._set_adapter_mapping)
+        self._set_adapter_mapping(mapping)
+        self._last_mapping = mapping
 
     def remove_adapter(self, adapter_id: int) -> bool:
-        return remove_adapter(adapter_id, self._registered_adapters,
-                              self.deactivate_adapter)
+        self.deactivate_adapter(adapter_id)
+        if adapter_id not in self._registered_adapters:
+            return False
+        self._registered_adapters.pop(adapter_id, None)
+        return True
 
-    def list_adapters(self) -> dict[int, Any]:
-        return list_adapters(self._registered_adapters)
+    def list_adapters(self) -> dict[int, ControlVectorModel]:
+        return dict(self._registered_adapters)
 
-    def get_adapter(self, adapter_id: int) -> Optional[Any]:
-        return get_adapter(adapter_id, self._registered_adapters)
+    def get_adapter(self, adapter_id: int) -> Optional[ControlVectorModel]:
+        return self._registered_adapters.get(adapter_id)
 
     def pin_adapter(self, adapter_id: int) -> bool:
         raise NotImplementedError
@@ -282,6 +301,9 @@ class LRUCacheControlVectorModelManager(ControlVectorModelManager):
     def list_adapters(self) -> dict[int, ControlVectorModel]:
         """List all registered ControlVectorModel."""
         return dict(self._registered_adapters.cache)
+
+    def __len__(self) -> int:
+        return len(self._registered_adapters)
 
     def activate_adapter(
         self,

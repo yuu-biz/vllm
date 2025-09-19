@@ -16,6 +16,7 @@ from vllm.config.kv_events import KVEventsConfig
 from vllm.config.kv_transfer import KVTransferConfig
 from vllm.config.load import LoadConfig
 from vllm.config.lora import LoRAConfig
+from vllm.config.control_vector import ControlVectorConfig
 from vllm.confg.control_vector import ControlVectorConfig
 from vllm.config.mamba import MambaConfig
 from vllm.config.model import (

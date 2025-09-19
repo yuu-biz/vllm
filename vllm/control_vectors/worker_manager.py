@@ -1,15 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import torch
 
-from vllm.adapter_commons.utils import (add_adapter_worker,
-                                        apply_adapters_worker,
-                                        list_adapters_worker,
-                                        set_active_adapters_worker)
-from vllm.adapter_commons.worker_manager import AbstractWorkerManager
-from vllm.config import ControlVectorConfig
+from vllm.config.control_vector import ControlVectorConfig
 from vllm.control_vectors.models import (ControlVectorModel,
                                          ControlVectorModelManager,
                                          LRUCacheControlVectorModelManager,
@@ -19,7 +14,7 @@ from vllm.control_vectors.request import ControlVectorRequest
 logger = logging.getLogger(__name__)
 
 
-class WorkerControlVectorManager(AbstractWorkerManager):
+class WorkerControlVectorManager:
     """WorkerControlVectorManager that manages
     control vector models on the worker side.
 
@@ -38,7 +33,7 @@ class WorkerControlVectorManager(AbstractWorkerManager):
         self._adapter_manager: ControlVectorModelManager
         self._control_vector_model_cls = control_vector_model_cls
         self.control_vector_config = control_vector_config
-        super().__init__(device)
+        self.device = device
 
     @property
     def is_enabled(self) -> bool:
@@ -82,19 +77,36 @@ class WorkerControlVectorManager(AbstractWorkerManager):
 
     def set_active_adapters(self, requests: set[Any]) -> None:
         mapping = next((request.adapter_id for request in requests), None)
-        set_active_adapters_worker(requests, mapping, self._apply_adapters,
-                                   self._adapter_manager.set_adapter_mapping)
+        self._apply_adapters(requests)
+        self._adapter_manager.set_adapter_mapping(mapping)
 
     def add_adapter(self, adapter_request: Any) -> bool:
-        return add_adapter_worker(adapter_request, self.list_adapters,
-                                  self._load_adapter,
-                                  self._adapter_manager.add_adapter,
-                                  self._adapter_manager.activate_adapter)
+        if adapter_request.adapter_id in self.list_adapters():
+            return False
+        loaded_adapter = self._load_adapter(adapter_request)
+        loaded = self._adapter_manager.add_adapter(loaded_adapter)
+        self._adapter_manager.activate_adapter(loaded_adapter.id)
+        return loaded
 
     def _apply_adapters(self, adapter_requests: set[Any]) -> None:
-        apply_adapters_worker(adapter_requests, self.list_adapters,
-                              self._adapter_manager.adapter_slots,
-                              self.remove_adapter, self.add_adapter)
+        existing_adapters = self.list_adapters()
+        models_map = {
+            adapter_request.adapter_id: adapter_request
+            for adapter_request in adapter_requests if adapter_request
+        }
+        if len(models_map) > self._adapter_manager.adapter_slots:
+            raise RuntimeError(
+                f"Number of requested control vectors "
+                f"({len(models_map)}) is greater "
+                "than the number of GPU control vector slots "
+                f"({self._adapter_manager.adapter_slots}).")
+        new_adapters = set(models_map.keys())
+        adapters_to_add = new_adapters - existing_adapters
+        adapters_to_remove = existing_adapters - new_adapters
+        for adapter_id in adapters_to_remove:
+            self.remove_adapter(adapter_id)
+        for adapter_id in adapters_to_add:
+            self.add_adapter(models_map[adapter_id])
 
     def remove_adapter(self, adapter_id: int) -> bool:
         return self._adapter_manager.remove_adapter(adapter_id)
@@ -103,7 +115,7 @@ class WorkerControlVectorManager(AbstractWorkerManager):
         self._adapter_manager.remove_all_adapters()
 
     def list_adapters(self) -> set[int]:
-        return list_adapters_worker(self._adapter_manager.list_adapters)
+        return set(self._adapter_manager.list_adapters().keys())
 
 
 class LRUCacheWorkerControlVectorManager(WorkerControlVectorManager):
@@ -132,6 +144,7 @@ class LRUCacheWorkerControlVectorManager(WorkerControlVectorManager):
 
     def _apply_adapters(
             self, control_vector_requests: set[ControlVectorRequest]) -> None:
+        models_that_exist = self.list_adapters()
         control_vectors_map = {
             control_vector_request.control_vector_id: control_vector_request
             for control_vector_request in control_vector_requests
@@ -142,8 +155,13 @@ class LRUCacheWorkerControlVectorManager(WorkerControlVectorManager):
                                f"({len(control_vectors_map)}) is greater "
                                "than the number of GPU control vector slots "
                                f"({self._adapter_manager.adapter_slots}).")
-        for control_vector in control_vectors_map.values():
-            self.add_adapter(control_vector)
+        new_adapters = set(control_vectors_map.keys())
+        adapters_to_add = new_adapters - models_that_exist
+        adapters_to_remove = models_that_exist - new_adapters
+        for adapter_id in adapters_to_remove:
+            self.remove_adapter(adapter_id)
+        for adapter_id in adapters_to_add:
+            self.add_adapter(control_vectors_map[adapter_id])
 
     def add_adapter(self,
                     control_vector_request: ControlVectorRequest) -> bool:

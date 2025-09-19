@@ -9,7 +9,7 @@ from typing import Union
 
 import torch.nn as nn
 
-from vllm.config import ControlVectorConfig
+from vllm.config.control_vector import ControlVectorConfig
 from vllm.logger import init_logger
 from vllm.control_vectors.request import ControlVectorRequest
 from vllm.control_vectors.worker_manager import LRUCacheWorkerControlVectorManager  # noqa: E501
