@@ -498,6 +498,78 @@ def _gen_prompt_embeds_extra_hash_keys(
     return [embeds_hash]
 
 
+def _gen_control_vector_extra_hash_keys(request: Request) -> list[Any]:
+    """Generate extra keys related to Control Vector for block hash computation.
+
+    Args:
+        request: The request object.
+
+    Returns:
+        Return Control Vector id and scale factor of the request if it is a 
+        Control Vector request. Return empty list otherwise.
+    """
+    if not request.control_vector_request:
+        return []
+    return [
+        request.control_vector_request.control_vector_id,
+        request.control_vector_request.scale_factor
+    ]
+
+
+def _gen_control_vector_extra_hash_keys(request: Request) -> list[Any]:
+    """Generate extra keys related to Control Vector for block hash computation.
+
+    Args:
+        request: The request object.
+
+    Returns:
+        Return Control Vector id and scale factor of the request if it is a 
+        Control Vector request. Return empty list otherwise.
+    """
+    if not request.control_vector_request:
+        return []
+    return [
+        request.control_vector_request.control_vector_id,
+        request.control_vector_request.scale_factor
+    ]
+
+
+def _gen_control_vector_extra_hash_keys(request: Request) -> list[Any]:
+    """Generate extra keys related to Control Vector for block hash computation.
+
+    Args:
+        request: The request object.
+
+    Returns:
+        Return Control Vector id and scale factor of the request if it is a 
+        Control Vector request. Return empty list otherwise.
+    """
+    if not request.control_vector_request:
+        return []
+    return [
+        request.control_vector_request.control_vector_id,
+        request.control_vector_request.scale_factor
+    ]
+
+
+def _gen_control_vector_extra_hash_keys(request: Request) -> list[Any]:
+    """Generate extra keys related to Control Vector for block hash computation.
+
+    Args:
+        request: The request object.
+
+    Returns:
+        Return Control Vector id and scale factor of the request if it is a 
+        Control Vector request. Return empty list otherwise.
+    """
+    if not request.control_vector_request:
+        return []
+    return [
+        request.control_vector_request.control_vector_id,
+        request.control_vector_request.scale_factor
+    ]
+
+
 def generate_block_hash_extra_keys(
     request: Request, start_token_idx: int, end_token_idx: int, start_mm_idx: int
 ) -> tuple[tuple[Any, ...] | None, int]:
@@ -519,6 +591,7 @@ def generate_block_hash_extra_keys(
         request, start_token_idx, end_token_idx, start_mm_idx
     )
     lora_extra_keys: list[str] = _gen_lora_extra_hash_keys(request)
+    control_vector_extra_keys: list[Any] = _gen_control_vector_extra_hash_keys(request)
     cache_salt_keys: list[str] = (
         [request.cache_salt] if (start_token_idx == 0 and request.cache_salt) else []
     )
@@ -527,7 +600,7 @@ def generate_block_hash_extra_keys(
     )
 
     extra_keys: list[Any] = (
-        lora_extra_keys + mm_extra_keys + cache_salt_keys + prompt_embeds_keys
+        lora_extra_keys + mm_extra_keys + control_vector_extra_keys + cache_salt_keys + prompt_embeds_keys
     )
 
     if not extra_keys:
