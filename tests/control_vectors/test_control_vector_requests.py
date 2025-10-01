@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 import openai
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ control_vector_path_spanish = \
     "yuu-biz/qwen-cv-example/english_spanish_vector_qwen.gguf"
 spanish = "spanish"
 
+
 @pytest.fixture(scope="session")
 def server():
     command = [
@@ -24,7 +26,8 @@ def server():
         "--max-control-vectors",
         "10000",
         "--control-vectors",
-        '{"name": "spanish", "path": "' + control_vector_path_spanish + '", "scale_factor": 1.0}',
+        '{"name": "spanish", "path": "' + control_vector_path_spanish +
+        '", "scale_factor": 1.0}',
     ]
 
     env = {
