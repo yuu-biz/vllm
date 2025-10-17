@@ -37,6 +37,7 @@ from .kv_events import KVEventsConfig
 from .kv_transfer import KVTransferConfig
 from .load import LoadConfig
 from .lora import LoRAConfig
+from .control_vector import ControlVectorConfig
 from .mamba import MambaConfig
 from .model import ModelConfig
 from .observability import ObservabilityConfig
@@ -297,6 +298,8 @@ class VllmConfig:
     """Kernel configuration."""
     lora_config: LoRAConfig | None = None
     """LoRA configuration."""
+    control_vector_config: ControlVectorConfig | None = None
+    """Control vector configuration."""
     speculative_config: SpeculativeConfig | None = None
     """Speculative decoding configuration."""
     structured_outputs_config: StructuredOutputsConfig = Field(
@@ -418,6 +421,10 @@ class VllmConfig:
             vllm_factors.append("None")
         if self.lora_config:
             vllm_factors.append(self.lora_config.compute_hash())
+        else:
+            vllm_factors.append("None")
+        if self.control_vector_config:
+            vllm_factors.append(self.control_vector_config.compute_hash())
         else:
             vllm_factors.append("None")
         if self.speculative_config:

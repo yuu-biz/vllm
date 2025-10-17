@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from vllm.sampling_params import SamplingParams
     from vllm.v1.request import Request
 else:
+    ControlVectorRequest = object
     ECConnectorMetadata = object
     KVConnectorMetadata = object
     LoRARequest = object

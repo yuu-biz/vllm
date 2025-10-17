@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
-from typing import Literal, Optional
+import hashlib
+from typing import Any, Optional
 
 import torch
 from pydantic import ConfigDict
@@ -24,6 +25,15 @@ class ControlVectorConfig:
     normalize: bool = False
     """Enable normalization for ControlVectors."""
 
+    def compute_hash(self) -> str:
+        factors: list[Any] = []
+        factors.append(self.max_control_vectors)
+        factors.append(self.adapter_dtype)
+        factors.append(self.normalize)
+        
+        hash_str = hashlib.md5(str(factors).encode(), usedforsecurity=False).hexdigest()
+        return hash_str
+    
     def __post_init__(self):
         if self.max_control_vectors < 1:
             raise ValueError("max_control_vectors must be >= 1")
