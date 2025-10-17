@@ -14,7 +14,7 @@ from vllm.control_vectors.layers import (ControlVectorMapping,
                                          MLPWithControlVector)
 
 from vllm.model_executor.models.interfaces import supports_multimodal
-from vllm.utils import LRUCache
+from vllm.utils.cache import LRUCache
 
 logger = logging.getLogger(__name__)
 
@@ -273,7 +273,7 @@ class ControlVectorModelManager:
     def list_adapters(self) -> dict[int, ControlVectorModel]:
         return dict(self._registered_adapters)
 
-    def get_adapter(self, adapter_id: int) -> Optional[ControlVectorModel]:
+    def get_adapter(self, adapter_id: int) -> ControlVectorModel | None:
         return self._registered_adapters.get(adapter_id)
 
     def pin_adapter(self, adapter_id: int) -> bool:

@@ -41,7 +41,7 @@ class RequestLogger:
         prompt_embeds: torch.Tensor | None,
         params: SamplingParams | PoolingParams | BeamSearchParams | None,
         lora_request: LoRARequest | None,
-        control_vector_request: Optional[ControlVectorRequest],
+        control_vector_request: ControlVectorRequest | None,
     ) -> None:
         if logger.isEnabledFor(logging.DEBUG):
             max_log_len = self.max_log_len

@@ -73,8 +73,8 @@ class ControlVectorParserAction(argparse.Action):
         self,
         parser: argparse.ArgumentParser,
         namespace: argparse.Namespace,
-        values: Optional[Union[str, Sequence[str]]],
-        option_string: Optional[str] = None,
+        values: str | Sequence[str] | None,
+        option_string: str | None = None,
     ):
         if values is None:
             values = []
@@ -295,7 +295,7 @@ class FrontendArgs(BaseFrontendArgs):
     or JSON list format. Example (old format): `'name=path'` Example (new
     format): `{\"name\": \"name\", \"path\": \"lora_path\",
     \"base_model_name\": \"id\"}`"""
-    control_vectors: Optional[list[ControlVectorPath]] = None
+    control_vectors: list[ControlVectorPath] | None = None
     """ControlVector configurations in JSON format. Example (new format):
     `{\"name\": \"name\", \"path\": \"control_vector_path\", 
     \"scale_factor\": \"value\", \"base_model_name\": \"id\"}`

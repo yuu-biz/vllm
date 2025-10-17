@@ -75,7 +75,7 @@ class EngineClient(ABC):
         prompt_text: str | None = None,
         lora_request: LoRARequest | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
-        control_vector_request: Optional[ControlVectorRequest] = None,
+        control_vector_request: ControlVectorRequest | None = None,
         trace_headers: Mapping[str, str] | None = None,
         priority: int = 0,
         data_parallel_rank: int | None = None,

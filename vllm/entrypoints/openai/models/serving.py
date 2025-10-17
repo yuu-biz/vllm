@@ -382,8 +382,8 @@ class OpenAIServingModels:
     async def load_control_vector(
         self,
         request: LoadControlVectorRequest,
-        base_model_name: Optional[str] = None,
-    ) -> Union[ErrorResponse, str]:
+        base_model_name: str | None = None,
+    ) -> ErrorResponse | str:
         error_check_ret = await self._check_load_control_vector_request(request
                                                                         )
         if error_check_ret is not None:
@@ -432,7 +432,7 @@ class OpenAIServingModels:
 
     async def unload_control_vector(
             self,
-            request: UnloadControlVectorRequest) -> Union[ErrorResponse, str]:
+            request: UnloadControlVectorRequest) -> ErrorResponse | str:
         error_check_ret = await self._check_unload_control_vector_request(
             request)
         if error_check_ret is not None:
@@ -450,7 +450,7 @@ class OpenAIServingModels:
 
     async def _check_load_control_vector_request(
             self,
-            request: LoadControlVectorRequest) -> Optional[ErrorResponse]:
+            request: LoadControlVectorRequest) -> ErrorResponse | None:
         # Check if both 'control_vector_name' and 'control_vector_path'
         # are provided
         if not request.control_vector_name or not request.control_vector_path:
@@ -477,7 +477,7 @@ class OpenAIServingModels:
 
     async def _check_unload_control_vector_request(
             self,
-            request: UnloadControlVectorRequest) -> Optional[ErrorResponse]:
+            request: UnloadControlVectorRequest) -> ErrorResponse | None:
         # Check if either 'control_vector_name' or 'control_vector_int_id'
         # is provided
         if (not request.control_vector_name
@@ -507,8 +507,8 @@ class OpenAIServingModels:
     async def load_control_vector(
         self,
         request: LoadControlVectorRequest,
-        base_model_name: Optional[str] = None,
-    ) -> Union[ErrorResponse, str]:
+        base_model_name: str | None = None,
+    ) -> ErrorResponse | str:
         error_check_ret = await self._check_load_control_vector_request(request
                                                                         )
         if error_check_ret is not None:
@@ -557,7 +557,7 @@ class OpenAIServingModels:
 
     async def unload_control_vector(
             self,
-            request: UnloadControlVectorRequest) -> Union[ErrorResponse, str]:
+            request: UnloadControlVectorRequest) -> ErrorResponse | str:
         error_check_ret = await self._check_unload_control_vector_request(
             request)
         if error_check_ret is not None:
@@ -575,7 +575,7 @@ class OpenAIServingModels:
 
     async def _check_load_control_vector_request(
             self,
-            request: LoadControlVectorRequest) -> Optional[ErrorResponse]:
+            request: LoadControlVectorRequest) -> ErrorResponse | None:
         # Check if both 'control_vector_name' and 'control_vector_path'
         # are provided
         if not request.control_vector_name or not request.control_vector_path:
@@ -602,7 +602,7 @@ class OpenAIServingModels:
 
     async def _check_unload_control_vector_request(
             self,
-            request: UnloadControlVectorRequest) -> Optional[ErrorResponse]:
+            request: UnloadControlVectorRequest) -> ErrorResponse | None:
         # Check if either 'control_vector_name' or 'control_vector_int_id'
         # is provided
         if (not request.control_vector_name

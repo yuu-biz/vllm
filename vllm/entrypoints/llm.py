@@ -451,7 +451,7 @@ class LLM:
         *,
         use_tqdm: bool | Callable[..., tqdm] = True,
         lora_request: Sequence[LoRARequest] | LoRARequest | None = None,
-        control_vector_request: Optional[ControlVectorRequest] = None,
+        control_vector_request: ControlVectorRequest | None = None,
         priority: list[int] | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
         mm_processor_kwargs: dict[str, Any] | None = None,
@@ -1082,7 +1082,7 @@ class LLM:
         *,
         use_tqdm: bool | Callable[..., tqdm] = True,
         lora_request: list[LoRARequest] | LoRARequest | None = None,
-        control_vector_request: Optional[ControlVectorRequest] = None,
+        control_vector_request: ControlVectorRequest | None = None,
         pooling_task: PoolingTask | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
     ) -> list[PoolingRequestOutput]:
@@ -1367,7 +1367,7 @@ class LLM:
         use_tqdm: bool | Callable[..., tqdm] = True,
         pooling_params: PoolingParams | None = None,
         lora_request: list[LoRARequest] | LoRARequest | None = None,
-        control_vector_request: Optional[ControlVectorRequest] = None,
+        control_vector_request: ControlVectorRequest | None = None,
         tokenization_kwargs: dict[str, Any] | None = None,
         chat_template: str | None = None,
     ) -> list[ScoringRequestOutput]:
@@ -1827,7 +1827,7 @@ class LLM:
         prompt: EngineInput,
         params: SamplingParams | PoolingParams,
         lora_request: LoRARequest | None = None,
-        control_vector_request: Optional[ControlVectorRequest] = None,
+        control_vector_request: ControlVectorRequest | None = None,
         priority: int = 0,
     ) -> str:
         if isinstance(params, SamplingParams):
@@ -1841,6 +1841,7 @@ class LLM:
             prompt,
             params,
             lora_request=lora_request,
+            control_vector_request=control_vector_request,
             priority=priority,
         )
 
