@@ -937,6 +937,10 @@ class AsyncLLM(EngineClient):
         """Prevent an adapter from being evicted."""
         return await self.engine_core.pin_lora_async(lora_id)
 
+    async def add_control_vector(self, control_vector_request) -> bool:
+        """Load a new Control Vector adapter into the engine for future requests."""
+        return await self.engine_core.add_control_vector_async(control_vector_request)
+
     async def add_control_vector(
             self, control_vector_request: ControlVectorRequest) -> bool:
         """
