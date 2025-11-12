@@ -2111,6 +2111,10 @@ class GPUModelRunner(LoRAModelRunnerMixin, ControlVectorModelRunnerMixin,
                 self.input_batch, num_scheduled_tokens, num_sampled_tokens
             )
 
+        # Hot-Swap control vectors
+        if self.control_vector_config:
+            self.set_active_control_vectors(self.input_batch)
+
         return (
             logits_indices,
             spec_decode_metadata,
