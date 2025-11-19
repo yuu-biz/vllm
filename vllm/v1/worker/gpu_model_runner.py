@@ -1179,7 +1179,8 @@ class GPUModelRunner(LoRAModelRunnerMixin, ControlVectorModelRunnerMixin,
                 num_computed_tokens=new_req_data.num_computed_tokens,
                 output_token_ids=[],
                 lora_request=new_req_data.lora_request,
-                control_vector_request=new_req_data.control_vector_request)
+                control_vector_request=new_req_data.control_vector_request,
+            )
             self.requests[req_id] = req_state
             self.late_interaction_runner.register_request(req_id, pooling_params)
 
@@ -4871,7 +4872,8 @@ class GPUModelRunner(LoRAModelRunnerMixin, ControlVectorModelRunnerMixin,
                     )
                 if self.control_vector_config:
                 self.model = self.load_control_vector_model(
-                    self.model, self.control_vector_config, self.device)
+                    self.model, self.control_vector_config, self.device
+                )
             if hasattr(self, "drafter"):
                     logger.info_once("Loading drafter model...")
                     self.drafter.load_model(self.model)

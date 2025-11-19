@@ -37,6 +37,7 @@ from vllm.config import (
     CacheConfig,
     CompilationConfig,
     ConfigType,
+    ControlVectorConfig,
     DeviceConfig,
     ECTransferConfig,
     EPLBConfig,
@@ -45,7 +46,6 @@ from vllm.config import (
     KVTransferConfig,
     LoadConfig,
     LoRAConfig,
-    ControlVectorConfig,
     MambaConfig,
     ModelConfig,
     MultiModalConfig,
@@ -1266,12 +1266,14 @@ class EngineArgs:
         control_vector_group.add_argument(
             "--enable-control-vector",
             action=argparse.BooleanOptionalAction,
-            help="If True, enable handling of ControlVectors.")
+            help="If True, enable handling of ControlVectors.",
+        )
         control_vector_group.add_argument(
-            "--max-control-vectors",
-            **control_vector_kwargs["max_control_vectors"])
-        control_vector_group.add_argument("--normalize-control-vector",
-                                          **control_vector_kwargs["normalize"])
+            "--max-control-vectors", **control_vector_kwargs["max_control_vectors"]
+        )
+        control_vector_group.add_argument(
+            "--normalize-control-vector", **control_vector_kwargs["normalize"]
+        )
 
         # Observability arguments
         observability_kwargs = get_kwargs(ObservabilityConfig)
@@ -2032,17 +2034,21 @@ class EngineArgs:
 
         control_vector_config = (
             ControlVectorConfig(
-            max_control_vectors=self.max_control_vectors,
-            normalize=self.normalize_control_vector,
-            ) 
-            if self.enable_control_vector 
+                max_control_vectors=self.max_control_vectors,
+                normalize=self.normalize_control_vector,
+            )
+            if self.enable_control_vector
             else None
         )
 
-        control_vector_config = ControlVectorConfig(
-            max_control_vectors=self.max_control_vectors,
-            normalize=self.normalize_control_vector,
-        ) if self.enable_control_vector else None
+        control_vector_config = (
+            ControlVectorConfig(
+                max_control_vectors=self.max_control_vectors,
+                normalize=self.normalize_control_vector,
+            )
+            if self.enable_control_vector
+            else None
+        )
 
         # bitsandbytes pre-quantized model need a specific model loader
         if model_config.quantization == "bitsandbytes":

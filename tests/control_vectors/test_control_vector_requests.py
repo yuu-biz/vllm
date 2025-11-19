@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 import openai
 import pytest
 import pytest_asyncio
@@ -7,11 +8,10 @@ import requests as http_requests
 from tests.utils import RemoteOpenAIServer
 
 MODEL_PATH = "Qwen/Qwen2.5-1.5B-Instruct"
-control_vector_path_happy = \
-    "yuu-biz/qwen-cv-example/happy_vector_qwen.gguf"
-control_vector_path_spanish = \
-    "yuu-biz/qwen-cv-example/english_spanish_vector_qwen.gguf"
+control_vector_path_happy = "yuu-biz/qwen-cv-example/happy_vector_qwen.gguf"
+control_vector_path_spanish = "yuu-biz/qwen-cv-example/english_spanish_vector_qwen.gguf"
 spanish = "spanish"
+
 
 @pytest.fixture(scope="session")
 def server():
@@ -24,7 +24,9 @@ def server():
         "--max-control-vectors",
         "10000",
         "--control-vectors",
-        '{"name": "spanish", "path": "' + control_vector_path_spanish + '", "scale_factor": 1.0}',
+        '{"name": "spanish", "path": "'
+        + control_vector_path_spanish
+        + '", "scale_factor": 1.0}',
     ]
 
     env = {
@@ -32,10 +34,9 @@ def server():
         "VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING": "1",
     }
 
-    with RemoteOpenAIServer(model=MODEL_PATH,
-                            vllm_serve_args=command,
-                            env_dict=env,
-                            auto_port=False) as server:
+    with RemoteOpenAIServer(
+        model=MODEL_PATH, vllm_serve_args=command, env_dict=env, auto_port=False
+    ) as server:
         yield server
 
 
@@ -59,13 +60,12 @@ async def test_load_control_vector(client: openai.AsyncOpenAI):
         "control_vector_scale": 2.0,
     }
 
-    response = http_requests.post(url=load_control_vector_url,
-                                  json=params,
-                                  headers=header)
+    response = http_requests.post(
+        url=load_control_vector_url, json=params, headers=header
+    )
 
     print("Response from server:", response.text)
-    assert response.text == \
-        "Success: Control vector 'happy' added successfully."
+    assert response.text == "Success: Control vector 'happy' added successfully."
 
 
 def test_unload_control_vector(client: openai.AsyncOpenAI):
@@ -75,29 +75,24 @@ def test_unload_control_vector(client: openai.AsyncOpenAI):
         "Content-Type": "application/json",
     }
 
-    response = http_requests.post(url=url,
-                                  json={"control_vector_name": "happy"},
-                                  headers=header)
+    response = http_requests.post(
+        url=url, json={"control_vector_name": "happy"}, headers=header
+    )
 
     print("Response from server:", response.text)
-    assert response.text == \
-        "Success: control vector 'happy' removed successfully."
+    assert response.text == "Success: control vector 'happy' removed successfully."
 
 
 @pytest.mark.asyncio
 async def test_chat_completions_control_vector(client: openai.AsyncOpenAI):
-
     result = []
 
     response = await client.chat.completions.create(
         model=spanish,
-        messages=[{
-            "role": "system",
-            "content": "You are a helpful assistant."
-        }, {
-            "role": "user",
-            "content": "Write a story about dog:"
-        }],
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Write a story about dog:"},
+        ],
         max_tokens=50,
         temperature=0.0,
         stop=["[/assistant]"],

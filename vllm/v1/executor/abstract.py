@@ -312,10 +312,12 @@ class Executor(ABC):
         return sets[0]
 
     def add_control_vector(self, control_vector_request) -> bool:
-        assert control_vector_request.control_vector_id > 0, \
+        assert control_vector_request.control_vector_id > 0, (
             "control_vector_id must be greater than 0."
-        return all(self.collective_rpc("add_control_vector", 
-                                       args=(control_vector_request,)))
+        )
+        return all(
+            self.collective_rpc("add_control_vector", args=(control_vector_request,))
+        )
 
     def reset_mm_cache(self) -> None:
         """Reset the multi-modal cache in each worker."""

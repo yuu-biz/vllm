@@ -466,6 +466,7 @@ class OpenAISpeechToText(OpenAIServing):
                 request_id_item,
                 engine_input,
                 params=sampling_params,
+                control_vector_request=None,
                 lora_request=lora_request,
             )
 

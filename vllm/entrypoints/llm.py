@@ -41,6 +41,7 @@ from vllm.distributed.weight_transfer.base import (
     WeightTransferInitRequest,
     WeightTransferUpdateRequest,
 )
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.engine.arg_utils import EngineArgs
 from vllm.entrypoints.chat_utils import (
     ChatCompletionMessageParam,
@@ -62,7 +63,6 @@ from vllm.inputs import (
 )
 from vllm.logger import init_logger
 from vllm.lora.request import LoRARequest
-from vllm.control_vectors.request import ControlVectorRequest
 from vllm.model_executor.layers.quantization import QuantizationMethods
 from vllm.outputs import (
     ClassificationRequestOutput,

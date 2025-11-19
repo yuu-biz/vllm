@@ -11,9 +11,9 @@ from vllm.distributed.weight_transfer.base import (
     WeightTransferInitRequest,
     WeightTransferUpdateRequest,
 )
+from vllm.control_vectors.request import ControlVectorRequest
 from vllm.inputs import EngineInput, PromptType
 from vllm.lora.request import LoRARequest
-from vllm.control_vectors.request import ControlVectorRequest
 from vllm.outputs import PoolingRequestOutput, RequestOutput
 from vllm.pooling_params import PoolingParams
 from vllm.renderers import BaseRenderer
@@ -170,7 +170,8 @@ class EngineClient(ABC):
 
     @abstractmethod
     async def add_control_vector(
-            self, control_vector_request: ControlVectorRequest) -> None:
+        self, control_vector_request: ControlVectorRequest
+    ) -> None:
         """
         Load a new ControlVector adapter into the engine for future requests.
         """

@@ -249,11 +249,13 @@ class InputBatch:
         self.lora_id_to_lora_request: dict[int, LoRARequest] = {}
 
         # control_vector related
-        self.request_control_vector_mapping = np.zeros((self.max_num_reqs, ),
-                                                       dtype=np.int32)
+        self.request_control_vector_mapping = np.zeros(
+            (self.max_num_reqs,), dtype=np.int32
+        )
         self.control_vector_id_to_request_ids: dict[int, set[str]] = {}
         self.control_vector_id_to_control_vector_request: dict[
-            int, ControlVectorRequest] = {}
+            int, ControlVectorRequest
+        ] = {}
 
         # req_index -> generator
         # NOTE(woosuk): The indices of the requests that do not have their own
@@ -491,14 +493,13 @@ class InputBatch:
         if request.control_vector_request:
             control_vector_id = request.control_vector_request.control_vector_id
             if control_vector_id not in self.control_vector_id_to_request_ids:
-                self.control_vector_id_to_request_ids[control_vector_id] = set(
-                )
+                self.control_vector_id_to_request_ids[control_vector_id] = set()
 
             self.request_control_vector_mapping[req_index] = control_vector_id
-            self.control_vector_id_to_request_ids[control_vector_id].add(
-                request.req_id)
-            self.control_vector_id_to_control_vector_request[
-                control_vector_id] = request.control_vector_request
+            self.control_vector_id_to_request_ids[control_vector_id].add(request.req_id)
+            self.control_vector_id_to_control_vector_request[control_vector_id] = (
+                request.control_vector_request
+            )
         else:
             # No ControlVector
             self.request_control_vector_mapping[req_index] = 0
@@ -565,12 +566,13 @@ class InputBatch:
         # ControlVector
         control_vector_id = self.request_control_vector_mapping[req_index]
         if control_vector_id != 0:
-            control_vector_req_ids = self.control_vector_id_to_request_ids[control_vector_id]
+            control_vector_req_ids = self.control_vector_id_to_request_ids[
+                control_vector_id
+            ]
             control_vector_req_ids.discard(req_id)
             if not control_vector_req_ids:
                 del self.control_vector_id_to_request_ids[control_vector_id]
-                del self.control_vector_id_to_control_vector_request[
-                    control_vector_id]
+                del self.control_vector_id_to_control_vector_request[control_vector_id]
             self.request_control_vector_mapping[req_index] = 0
 
         if self.is_pooling_model:
@@ -668,14 +670,10 @@ class InputBatch:
             self.request_lora_mapping[i1],
         )
 
-        self.request_control_vector_mapping[i1],
-        self.request_control_vector_mapping[i2] =\
+        (self.request_control_vector_mapping[i1],)
+        self.request_control_vector_mapping[i2] = (
             self.request_control_vector_mapping[i2],
-        self.request_control_vector_mapping[i1]
-
-        self.request_control_vector_mapping[i1],
-        self.request_control_vector_mapping[i2] =\
-            self.request_control_vector_mapping[i2],
+        )
         self.request_control_vector_mapping[i1]
 
         if self.is_pooling_model:
@@ -803,12 +801,12 @@ class InputBatch:
             self.block_table.move_row(last_req_index, empty_index)
 
             self.request_lora_mapping[empty_index] = self.request_lora_mapping[
-                last_req_index]
-
-            self.request_control_vector_mapping[
-                empty_index] = self.request_control_vector_mapping[
-                    last_req_index
+                last_req_index
             ]
+
+            self.request_control_vector_mapping[empty_index] = (
+                self.request_control_vector_mapping[last_req_index]
+            )
 
             if self.is_pooling_model:
                 last_req_index -= 1
@@ -1050,7 +1048,8 @@ class InputBatch:
 
     def make_control_vector_inputs(self):
         active_control_vector_requests: set[ControlVectorRequest] = set(
-            self.control_vector_id_to_control_vector_request.values())
+            self.control_vector_id_to_control_vector_request.values()
+        )
 
         return active_control_vector_requests
 

@@ -30,6 +30,7 @@ from vllm.utils.hashing import safe_hash
 from .attention import AttentionConfig
 from .cache import CacheConfig
 from .compilation import CompilationConfig, CompilationMode, CUDAGraphMode
+from .control_vector import ControlVectorConfig
 from .device import DeviceConfig
 from .ec_transfer import ECTransferConfig
 from .kernel import KernelConfig
@@ -37,7 +38,6 @@ from .kv_events import KVEventsConfig
 from .kv_transfer import KVTransferConfig
 from .load import LoadConfig
 from .lora import LoRAConfig
-from .control_vector import ControlVectorConfig
 from .mamba import MambaConfig
 from .model import ModelConfig
 from .observability import ObservabilityConfig

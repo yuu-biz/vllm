@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 
 import hashlib
-from typing import Any, Optional
+from typing import Any
 
 import torch
 from pydantic import ConfigDict
@@ -13,6 +13,7 @@ from vllm.logger import init_logger
 
 logger = init_logger(__name__)
 
+
 @config
 @dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class ControlVectorConfig:
@@ -20,7 +21,7 @@ class ControlVectorConfig:
 
     max_control_vectors: int = 1
     """Maximum number of ControlVectors in a batch."""
-    adapter_dtype: Optional[torch.dtype] = torch.float16
+    adapter_dtype: torch.dtype | None = torch.float16
     """Data type for ControlVectors."""
     normalize: bool = False
     """Enable normalization for ControlVectors."""
@@ -30,10 +31,10 @@ class ControlVectorConfig:
         factors.append(self.max_control_vectors)
         factors.append(self.adapter_dtype)
         factors.append(self.normalize)
-        
+
         hash_str = hashlib.md5(str(factors).encode(), usedforsecurity=False).hexdigest()
         return hash_str
-    
+
     def __post_init__(self):
         if self.max_control_vectors < 1:
             raise ValueError("max_control_vectors must be >= 1")

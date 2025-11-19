@@ -24,8 +24,7 @@ from vllm.entrypoints.constants import (
     H11_MAX_HEADER_COUNT_DEFAULT,
     H11_MAX_INCOMPLETE_EVENT_SIZE_DEFAULT,
 )
-from vllm.entrypoints.openai.models.protocol import LoRAModulePath
-from vllm.entrypoints.openai.models.protocol import ControlVectorPath
+from vllm.entrypoints.openai.models.protocol import ControlVectorPath, LoRAModulePath
 from vllm.logger import init_logger
 from vllm.tool_parsers import ToolParserManager
 from vllm.utils.argparse_utils import FlexibleArgumentParser
@@ -68,7 +67,6 @@ class LoRAParserAction(argparse.Action):
 
 
 class ControlVectorParserAction(argparse.Action):
-
     def __call__(
         self,
         parser: argparse.ArgumentParser,
@@ -83,9 +81,9 @@ class ControlVectorParserAction(argparse.Action):
 
         control_vector_list: list[ControlVectorPath] = []
         for item in values:
-            if item in [None, '']:  # Skip if item is None or empty string
+            if item in [None, ""]:  # Skip if item is None or empty string
                 continue
-            if '=' in item and ',' not in item:  # Old format: name=path
+            if "=" in item and "," not in item:  # Old format: name=path
                 parser.error(f"Invalid format for --control-vectors: {item}")
             else:  # Assume JSON format
                 try:
@@ -93,8 +91,7 @@ class ControlVectorParserAction(argparse.Action):
                     control_vector = ControlVectorPath(**control_vector_dict)
                     control_vector_list.append(control_vector)
                 except json.JSONDecodeError:
-                    parser.error(
-                        f"Invalid JSON format for --control-vectors: {item}")
+                    parser.error(f"Invalid JSON format for --control-vectors: {item}")
                 except TypeError as e:
                     parser.error(
                         f"Invalid fields for --control-vectors: {item} - {str(e)}"  # noqa: E501
@@ -381,8 +378,7 @@ class FrontendArgs(BaseFrontendArgs):
         # Special case: ControlVector modules need custom parser action and
         # optional_type(str)
         frontend_kwargs["control_vectors"]["type"] = optional_type(str)
-        frontend_kwargs["control_vectors"]["action"] = \
-            ControlVectorParserAction
+        frontend_kwargs["control_vectors"]["action"] = ControlVectorParserAction
 
         # Special case: Middleware needs to append action
         frontend_kwargs["middleware"]["action"] = "append"

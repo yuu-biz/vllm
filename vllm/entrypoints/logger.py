@@ -63,11 +63,13 @@ class RequestLogger:
             )
 
         logger.info(
-            "Received request %s: params: %s, lora_request: %s., control_vector_request: %s.",
+            "Received request %s: params: %s, lora_request: %s., "
+            "control_vector_request: %s.",
             request_id,
             params,
             lora_request,
-            control_vector_request)
+            control_vector_request,
+        )
 
     def log_outputs(
         self,

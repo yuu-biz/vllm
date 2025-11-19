@@ -42,7 +42,6 @@ class NewRequestData:
     control_vector_request: ControlVectorRequest | None
     prompt_embeds: "torch.Tensor | None" = None
     prompt_is_token_ids: list[bool] | None = None
-
     # Only used for v2 model runner.
     prefill_token_ids: list[int] | None = None
 

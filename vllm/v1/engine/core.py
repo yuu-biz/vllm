@@ -744,8 +744,7 @@ class EngineCore:
     def pin_lora(self, lora_id: int) -> bool:
         return self.model_executor.pin_lora(lora_id)
 
-    def add_control_vector(
-            self, control_vector_request: ControlVectorRequest) -> bool:
+    def add_control_vector(self, control_vector_request: ControlVectorRequest) -> bool:
         return self.model_executor.add_control_vector(control_vector_request)
 
     def save_sharded_state(

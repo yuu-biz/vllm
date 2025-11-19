@@ -941,8 +941,7 @@ class Worker(WorkerBase):
     def pin_lora(self, lora_id: int) -> bool:
         return self.model_runner.pin_lora(lora_id)
 
-    def add_control_vector(
-            self, control_vector_request: ControlVectorRequest) -> bool:
+    def add_control_vector(self, control_vector_request: ControlVectorRequest) -> bool:
         return self.model_runner.add_control_vector(control_vector_request)
 
     def check_health(self) -> None:

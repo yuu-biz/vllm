@@ -18,6 +18,8 @@ from vllm.entrypoints.openai.models.protocol import BaseModelPath, LoRAModulePat
 from vllm.entrypoints.serve.lora.protocol import (
     LoadLoRAAdapterRequest,
     UnloadLoRAAdapterRequest,
+)
+from vllm.entrypoints.serve.control_vector.protocol import (
     LoadControlVectorRequest,
     UnloadControlVectorRequest,
 )
@@ -149,11 +151,13 @@ class OpenAIServingModels:
             control_vector_request = LoadControlVectorRequest(
                 control_vector_path=control_vector.path,
                 control_vector_name=control_vector.name,
-                control_vector_scale=control_vector.scale_factor)
+                control_vector_scale=control_vector.scale_factor,
+            )
 
             load_result = await self.load_control_vector(
                 request=control_vector_request,
-                base_model_name=control_vector.base_model_name)
+                base_model_name=control_vector.base_model_name,
+            )
             if isinstance(load_result, ErrorResponse):
                 raise ValueError(load_result.message)
 
@@ -161,9 +165,9 @@ class OpenAIServingModels:
         return self.registry.is_base_model(model_name)
 
     def model_name(
-            self,
-            lora_request: LoRARequest | None = None,
-            control_vector_request: ControlVectorRequest | None = None
+        self,
+        lora_request: LoRARequest | None = None,
+        control_vector_request: ControlVectorRequest | None = None,
     ) -> str:
         """Returns the appropriate model name depending on the availability
         and support of the LoRA or ControlVector or base model.
@@ -195,12 +199,14 @@ class OpenAIServingModels:
             for lora in self.lora_requests.values()
         ]
         control_vector_cards = [
-            ModelCard(id=control_vector.control_vector_name,
-                      root=control_vector.control_vector_path,
-                      parent=control_vector.base_model_name
-                      if control_vector.base_model_name else
-                      self.base_model_paths[0].name,
-                      permission=[ModelPermission()])
+            ModelCard(
+                id=control_vector.control_vector_name,
+                root=control_vector.control_vector_path,
+                parent=control_vector.base_model_name
+                if control_vector.base_model_name
+                else self.base_model_paths[0].name,
+                permission=[ModelPermission()],
+            )
             for control_vector in self.control_vector_requests
         ]
         model_list.data.extend(lora_cards)
@@ -384,8 +390,7 @@ class OpenAIServingModels:
         request: LoadControlVectorRequest,
         base_model_name: str | None = None,
     ) -> ErrorResponse | str:
-        error_check_ret = await self._check_load_control_vector_request(request
-                                                                        )
+        error_check_ret = await self._check_load_control_vector_request(request)
         if error_check_ret is not None:
             return error_check_ret
 
@@ -400,15 +405,19 @@ class OpenAIServingModels:
             control_vector_id=unique_id,
             control_vector_path=control_vector_path,
             scale=scale,
-            base_model_name=None)
+            base_model_name=None,
+        )
         if base_model_name is not None and self.is_base_model(base_model_name):
             control_vector_request.base_model_name = base_model_name
 
         # Validate that the adapter can be loaded into the engine
         # This will also pre-load it for incoming requests
         try:
-            logger.info("Try to load new control vector: name '%s', path '%s'",
-                        control_vector_name, control_vector_path)
+            logger.info(
+                "Try to load new control vector: name '%s', path '%s'",
+                control_vector_name,
+                control_vector_path,
+            )
             await self.engine_client.add_control_vector(control_vector_request)
         except BaseException as e:
             error_type = "BadRequestError"
@@ -419,163 +428,40 @@ class OpenAIServingModels:
 
             logger.error(
                 "Cannot load new control vector: name '%s', path '%s'",
-                control_vector_name, control_vector_path)
-            return create_error_response(message=str(e),
-                                         err_type=error_type,
-                                         status_code=status_code)
+                control_vector_name,
+                control_vector_path,
+            )
+            return create_error_response(
+                message=str(e), err_type=error_type, status_code=status_code
+            )
 
         self.control_vector_requests.append(control_vector_request)
-        logger.info("Loaded new control vector: name '%s', path '%s'",
-                    control_vector_name, control_vector_path)
-        return (f"Success: Control vector '{control_vector_name}' "
-                "added successfully.")
+        logger.info(
+            "Loaded new control vector: name '%s', path '%s'",
+            control_vector_name,
+            control_vector_path,
+        )
+        return f"Success: Control vector '{control_vector_name}' added successfully."
 
     async def unload_control_vector(
-            self,
-            request: UnloadControlVectorRequest) -> ErrorResponse | str:
-        error_check_ret = await self._check_unload_control_vector_request(
-            request)
-        if error_check_ret is not None:
-            return error_check_ret
-
-        control_vector_name = request.control_vector_name
-        self.control_vector_requests = [
-            control_vector_request
-            for control_vector_request in self.control_vector_requests if
-            control_vector_request.control_vector_name != control_vector_name
-        ]
-        logger.info("Removed control vector: name '%s'", control_vector_name)
-        return (f"Success: control vector '{control_vector_name}' "
-                "removed successfully.")
-
-    async def _check_load_control_vector_request(
-            self,
-            request: LoadControlVectorRequest) -> ErrorResponse | None:
-        # Check if both 'control_vector_name' and 'control_vector_path'
-        # are provided
-        if not request.control_vector_name or not request.control_vector_path:
-            return create_error_response(
-                message="Both 'control_vector_name' and 'control_vector_path' "
-                "must be provided.",
-                err_type="InvalidUserInput",
-                status_code=HTTPStatus.BAD_REQUEST,
-            )
-
-        # Check if the control_vector adapter with the given name already exists
-        if any(control_vector_request.control_vector_name ==
-               request.control_vector_name
-               for control_vector_request in self.control_vector_requests):
-            return create_error_response(
-                message=
-                f"The control vector '{request.control_vector_name}' has "
-                "already been loaded.",
-                err_type="InvalidUserInput",
-                status_code=HTTPStatus.BAD_REQUEST,
-            )
-
-        return None
-
-    async def _check_unload_control_vector_request(
-            self,
-            request: UnloadControlVectorRequest) -> ErrorResponse | None:
-        # Check if either 'control_vector_name' or 'control_vector_int_id'
-        # is provided
-        if (not request.control_vector_name
-                and not request.control_vector_int_id):
-            return create_error_response(
-                message=
-                "either 'control_vector_name' and 'control_vector_int_id' "
-                "needs to be provided.",
-                err_type="InvalidUserInput",
-                status_code=HTTPStatus.BAD_REQUEST,
-            )
-
-        # Check if the control_vector adapter with the given name exists
-        if not any(control_vector_request.control_vector_name ==
-                   request.control_vector_name
-                   for control_vector_request in self.control_vector_requests):
-            return create_error_response(
-                message=
-                f"The control vector '{request.control_vector_name}' cannot be "
-                "found.",
-                err_type="NotFoundError",
-                status_code=HTTPStatus.NOT_FOUND,
-            )
-
-        return None
-
-    async def load_control_vector(
-        self,
-        request: LoadControlVectorRequest,
-        base_model_name: str | None = None,
+        self, request: UnloadControlVectorRequest
     ) -> ErrorResponse | str:
-        error_check_ret = await self._check_load_control_vector_request(request
-                                                                        )
-        if error_check_ret is not None:
-            return error_check_ret
-
-        control_vector_name, control_vector_path, scale = (
-            request.control_vector_name,
-            request.control_vector_path,
-            request.control_vector_scale,
-        )
-        unique_id = self.control_vector_id_counter.inc(1)
-        control_vector_request = ControlVectorRequest(
-            control_vector_name=control_vector_name,
-            control_vector_id=unique_id,
-            control_vector_path=control_vector_path,
-            scale=scale,
-            base_model_name=None)
-        if base_model_name is not None and self.is_base_model(base_model_name):
-            control_vector_request.base_model_name = base_model_name
-
-        # Validate that the adapter can be loaded into the engine
-        # This will also pre-load it for incoming requests
-        try:
-            logger.info("Try to load new control vector: name '%s', path '%s'",
-                        control_vector_name, control_vector_path)
-            await self.engine_client.add_control_vector(control_vector_request)
-        except BaseException as e:
-            error_type = "BadRequestError"
-            status_code = HTTPStatus.BAD_REQUEST
-            if isinstance(e, ValueError) and "No adapter found" in str(e):
-                error_type = "NotFoundError"
-                status_code = HTTPStatus.NOT_FOUND
-
-            logger.error(
-                "Cannot load new control vector: name '%s', path '%s'",
-                control_vector_name, control_vector_path)
-            return create_error_response(message=str(e),
-                                         err_type=error_type,
-                                         status_code=status_code)
-
-        self.control_vector_requests.append(control_vector_request)
-        logger.info("Loaded new control vector: name '%s', path '%s'",
-                    control_vector_name, control_vector_path)
-        return (f"Success: Control vector '{control_vector_name}' "
-                "added successfully.")
-
-    async def unload_control_vector(
-            self,
-            request: UnloadControlVectorRequest) -> ErrorResponse | str:
-        error_check_ret = await self._check_unload_control_vector_request(
-            request)
+        error_check_ret = await self._check_unload_control_vector_request(request)
         if error_check_ret is not None:
             return error_check_ret
 
         control_vector_name = request.control_vector_name
         self.control_vector_requests = [
             control_vector_request
-            for control_vector_request in self.control_vector_requests if
-            control_vector_request.control_vector_name != control_vector_name
+            for control_vector_request in self.control_vector_requests
+            if control_vector_request.control_vector_name != control_vector_name
         ]
         logger.info("Removed control vector: name '%s'", control_vector_name)
-        return (f"Success: control vector '{control_vector_name}' "
-                "removed successfully.")
+        return f"Success: control vector '{control_vector_name}' removed successfully."
 
     async def _check_load_control_vector_request(
-            self,
-            request: LoadControlVectorRequest) -> ErrorResponse | None:
+        self, request: LoadControlVectorRequest
+    ) -> ErrorResponse | None:
         # Check if both 'control_vector_name' and 'control_vector_path'
         # are provided
         if not request.control_vector_name or not request.control_vector_path:
@@ -587,12 +473,12 @@ class OpenAIServingModels:
             )
 
         # Check if the control_vector adapter with the given name already exists
-        if any(control_vector_request.control_vector_name ==
-               request.control_vector_name
-               for control_vector_request in self.control_vector_requests):
+        if any(
+            control_vector_request.control_vector_name == request.control_vector_name
+            for control_vector_request in self.control_vector_requests
+        ):
             return create_error_response(
-                message=
-                f"The control vector '{request.control_vector_name}' has "
+                message=f"The control vector '{request.control_vector_name}' has "
                 "already been loaded.",
                 err_type="InvalidUserInput",
                 status_code=HTTPStatus.BAD_REQUEST,
@@ -601,27 +487,25 @@ class OpenAIServingModels:
         return None
 
     async def _check_unload_control_vector_request(
-            self,
-            request: UnloadControlVectorRequest) -> ErrorResponse | None:
+        self, request: UnloadControlVectorRequest
+    ) -> ErrorResponse | None:
         # Check if either 'control_vector_name' or 'control_vector_int_id'
         # is provided
-        if (not request.control_vector_name
-                and not request.control_vector_int_id):
+        if not request.control_vector_name and not request.control_vector_int_id:
             return create_error_response(
-                message=
-                "either 'control_vector_name' and 'control_vector_int_id' "
+                message="either 'control_vector_name' and 'control_vector_int_id' "
                 "needs to be provided.",
                 err_type="InvalidUserInput",
                 status_code=HTTPStatus.BAD_REQUEST,
             )
 
         # Check if the control_vector adapter with the given name exists
-        if not any(control_vector_request.control_vector_name ==
-                   request.control_vector_name
-                   for control_vector_request in self.control_vector_requests):
+        if not any(
+            control_vector_request.control_vector_name == request.control_vector_name
+            for control_vector_request in self.control_vector_requests
+        ):
             return create_error_response(
-                message=
-                f"The control vector '{request.control_vector_name}' cannot be "
+                message=f"The control vector '{request.control_vector_name}' cannot be "
                 "found.",
                 err_type="NotFoundError",
                 status_code=HTTPStatus.NOT_FOUND,

@@ -938,12 +938,12 @@ class AsyncLLM(EngineClient):
         return await self.engine_core.pin_lora_async(lora_id)
 
     async def add_control_vector(
-            self, control_vector_request: ControlVectorRequest) -> bool:
+        self, control_vector_request: ControlVectorRequest
+    ) -> bool:
         """
         Load a new ControlVector adapter into the engine for future requests.
         """
-        return await self.engine_core.add_control_vector_async(
-            control_vector_request)
+        return await self.engine_core.add_control_vector_async(control_vector_request)
 
     async def collective_rpc(
         self,

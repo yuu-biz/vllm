@@ -438,8 +438,8 @@ class OpenAIServing:
             ):
                 error_response = load_result
         if request.model in [
-                control_vector.control_vector_name
-                for control_vector in self.models.control_vector_requests
+            control_vector.control_vector_name
+            for control_vector in self.models.control_vector_requests
         ]:
             return None 
 
@@ -477,8 +477,9 @@ class OpenAIServing:
         self,
         request: AnyRequest,
         supports_default_mm_loras: bool = False,
-    ) -> tuple[None, None] | tuple[LoRARequest, None] | tuple[None, ControlVectorRequest]:
-
+    ) -> (
+        tuple[None, None] | tuple[LoRARequest, None] | tuple[None, ControlVectorRequest]
+    ):
         if request.model in self.models.lora_requests:
             return self.models.lora_requests[request.model], None
 
@@ -775,10 +776,10 @@ class OpenAIServing:
         return self.models.is_base_model(model_name)
 
     def _get_model_name(
-            self,
-            model_name: str | None = None,
-            lora_request: LoRARequest | None = None,
-            control_vector_request: ControlVectorRequest | None = None
+        self,
+        model_name: str | None = None,
+        lora_request: LoRARequest | None = None,
+        control_vector_request: ControlVectorRequest | None = None,
     ) -> str:
         if lora_request:
             return lora_request.lora_name

@@ -212,8 +212,9 @@ class OpenAIServingCompletion(OpenAIServing):
 
         result_generator = merge_async_iterators(*generators)
 
-        model_name = self._get_model_name(request.model, lora_request,
-                                          control_vector_request)
+        model_name = self._get_model_name(
+            request.model, lora_request, control_vector_request
+        )
         num_prompts = len(engine_inputs)
 
         # Streaming response

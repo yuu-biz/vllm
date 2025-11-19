@@ -967,11 +967,12 @@ environment_variables: dict[str, Callable[[], Any]] = {
         in ("1", "true")
     ),
     # If set, allow loading or unloading control vector in runtime,
-    "VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING":lambda: (
-        os.environ.get("VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING", "0").
-        strip().lower() in ("1", "true")
+    "VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING": lambda: (
+        os.environ.get("VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING", "0")
+        .strip()
+        .lower()
+        in ("1", "true")
     ),
-
     # We assume drivers can report p2p status correctly.
     # If the program hangs when using custom allreduce,
     # potantially caused by a bug in the driver (535 series),

@@ -9,6 +9,7 @@ from vllm.config.compilation import (
     CUDAGraphMode,
     PassConfig,
 )
+from vllm.config.control_vector import ControlVectorConfig
 from vllm.config.device import DeviceConfig
 from vllm.config.ec_transfer import ECTransferConfig
 from vllm.config.kernel import KernelConfig
@@ -16,7 +17,6 @@ from vllm.config.kv_events import KVEventsConfig
 from vllm.config.kv_transfer import KVTransferConfig
 from vllm.config.load import LoadConfig
 from vllm.config.lora import LoRAConfig
-from vllm.config.control_vector import ControlVectorConfig
 from vllm.config.mamba import MambaConfig
 from vllm.config.model import (
     ModelConfig,

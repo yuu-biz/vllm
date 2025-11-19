@@ -261,7 +261,8 @@ class EngineCoreClient(ABC):
         raise NotImplementedError
 
     async def add_control_vector_async(
-            self, control_vector_request: ControlVectorRequest) -> bool:
+        self, control_vector_request: ControlVectorRequest
+    ) -> bool:
         raise NotImplementedError
 
     async def save_sharded_state_async(
@@ -868,8 +869,7 @@ class SyncMPClient(MPClient):
     def pin_lora(self, lora_id: int) -> bool:
         return self.call_utility("pin_lora", lora_id)
 
-    def add_control_vector(
-            self, control_vector_request: ControlVectorRequest) -> bool:
+    def add_control_vector(self, control_vector_request: ControlVectorRequest) -> bool:
         return self.call_utility("add_control_vector", control_vector_request)
 
     def sleep(self, level: int = 1, mode: PauseMode = "abort") -> None:
@@ -1133,9 +1133,11 @@ class AsyncMPClient(MPClient):
         return await self.call_utility_async("pin_lora", lora_id)
 
     async def add_control_vector_async(
-            self, control_vector_request: ControlVectorRequest) -> bool:
-        return await self.call_utility_async("add_control_vector",
-                                             control_vector_request)
+        self, control_vector_request: ControlVectorRequest
+    ) -> bool:
+        return await self.call_utility_async(
+            "add_control_vector", control_vector_request
+        )
 
     async def save_sharded_state_async(
         self, path: str, pattern: str | None = None, max_size: int | None = None
