@@ -205,11 +205,16 @@ class ControlVectorModelManager:
             v.set_active_tensor(index)
 
     def _create_control_vector_modules(self):
-        hidden_size = (
-            self.model.config.text_config.hidden_size
-            if supports_multimodal(self.model) and hasattr(self.model, "get_mm_mapping")
-            else self.model.config.hidden_size
-        )
+        # Check if the model is multimodal
+        if supports_multimodal(self.model):
+            error_msg = (
+                "Control Vector cannot be used with multimodal models. "
+                "Please use a text-only model when enabling Control Vector."
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        hidden_size = self.model.config.hidden_size
         dtype = self.model.config.torch_dtype
 
         for module_name, module in self.model.named_modules():
