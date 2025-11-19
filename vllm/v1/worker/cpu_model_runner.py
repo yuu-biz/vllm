@@ -107,6 +107,11 @@ class CPUModelRunner(GPUModelRunner):
         if self.lora_config:
             self.model = self.load_lora_model(self.model, self.vllm_config, self.device)
 
+        if self.control_vector_config:
+            self.model = self.load_control_vector_model(
+                self.model, self.control_vector_config, self.device
+            )
+
         if hasattr(self, "drafter"):
             logger.info_once("Loading drafter model...")
             self.drafter.load_model(self.model)
