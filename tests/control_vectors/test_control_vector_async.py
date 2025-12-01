@@ -1,9 +1,13 @@
-# SPDX-License-Identifier: Apache-2.0
-# SPDX-FileCopyrightText: Copyright contributors to the vLLM project
+from unittest import result
 import pytest
-import torch
 
-from vllm import LLM, EngineArgs, LLMEngine, SamplingParams
+import asyncio
+from contextlib import ExitStack
+import pytest
+
+from vllm import AsyncEngineArgs, SamplingParams
+from vllm.v1.engine.async_llm import AsyncLLM
+from vllm.utils.torch_utils import set_default_torch_num_threads
 from vllm.control_vectors.request import ControlVectorRequest
 
 MODEL_PATH = "Qwen/Qwen2.5-1.5B-Instruct"
@@ -12,7 +16,6 @@ control_vector_path_happy = \
 control_vector_path_spanish = \
     "yuu-biz/qwen-cv-example/english_spanish_vector_qwen.gguf"
 spanish = "spanish"
-
 
 @pytest.fixture
 def requests():
@@ -96,89 +99,73 @@ def requests():
     ]
 
 
-def do_sample(engine: LLMEngine, prompts):
-    request_id = 0
-    results = []
-    while prompts or engine.has_unfinished_requests():
-        if prompts:
-            prompt, sampling_params, control_vector_request = prompts.pop(0)
-            engine.add_request(str(request_id),
-                               prompt,
-                               sampling_params,
-                               control_vector_request=control_vector_request)
-            request_id += 1
 
-        request_outputs = engine.step()
-
-        for request_output in request_outputs:
-            if request_output.finished:
-                results.append({
-                    "request_id": request_output.request_id,
-                    "generation": request_output.outputs[0].text,
-                })
-    return results
-
-
+@pytest.mark.asyncio
 @pytest.mark.parametrize("enforce_eager", [False, True])
-def test_control_vector_adapter(requests, enforce_eager):
-    # envs.set_vllm_use_v1(use_v1=False)
-    engine_args = EngineArgs(
-        model=MODEL_PATH,
-        enable_control_vector=True,
-        max_control_vectors=10,
-        max_num_seqs=20,
-        gpu_memory_utilization=0.3,  # Reduce memory usage for tests
-        enforce_eager=enforce_eager,
-    )
-    engine = LLMEngine.from_engine_args(engine_args)
-    try:
-        result = do_sample(engine, requests)
-        print("step result:", result)
-        assert len(result) == 10
-    finally:
-        del engine
-        import gc
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+async def test_control_vector_async(monkeypatch, requests, enforce_eager: bool):
+    from vllm.platforms import current_platform
+    if not current_platform.is_cuda():
+        pytest.skip(reason="V1 currently only supported on CUDA.")
 
-
-@pytest.mark.parametrize("enforce_eager", [False, True])
-def test_offline_inferance(requests, enforce_eager):
-    # envs.set_vllm_use_v1(use_v1=False)
-    llm = LLM(
+    engine_args = AsyncEngineArgs(
         model=MODEL_PATH,
-        enable_control_vector=True,
         max_control_vectors=10,
         max_num_seqs=20,
         gpu_memory_utilization=0.3,  # Reduce memory usage for tests
         enforce_eager=enforce_eager,
     )
 
-    try:
+    with monkeypatch.context() as m, ExitStack() as after:
+        m.setenv("VLLM_USE_V1", "1")
+        with set_default_torch_num_threads(1):
+            engine = AsyncLLM.from_engine_args(engine_args)
+        after.callback(engine.shutdown)
+
+        prompts = requests
+        request_ids = [f"request-{i}" for i in range(len(prompts))]
         results = []
-        for request in requests:
-            prompt, sampling_param, control_vector_request = request
-            result = llm.generate(prompt,
-                                  sampling_param,
-                                  control_vector_request=control_vector_request)
-            results.append({
-                "prompt":
-                prompt,
-            "generation":
-            result[0].outputs[0].text,
-            "control_vector_name":
-            control_vector_request.control_vector_name
-            if control_vector_request else None,
-            "scale":
-            control_vector_request.scale_factor
-            if control_vector_request else None
-        })
+
+        # すべてのリクエストを非同期で投げる
+        tasks = []
+        for idx, (prompt, sampling_params, control_vector_request) in enumerate(prompts):
+            tasks.append(
+                asyncio.create_task(
+                    generate_with_control_vector(
+                        engine, request_ids[idx], prompt, sampling_params, control_vector_request
+                    )
+                )
+            )
+
+        # 結果を集める
+        done, pending = await asyncio.wait(tasks, return_when=asyncio.ALL_COMPLETED)
+        for task in pending:
+            task.cancel()
+        for task in done:
+            result = await task
+            results.append(result)
+
+        print("step result:", results)
         assert len(results) == 10
-        print("generate results:", results)
-    finally:
-        del llm
-        import gc
-        gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
+        assert all("request_id" in r and "generation" in r for r in results)
+
+    # Additional cleanup after ExitStack finishes
+    import gc
+    import torch
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
+async def generate_with_control_vector(engine, request_id, prompt, sampling_params, control_vector_request):
+    # 1リクエスト分の生成を行い、最終出力を返す
+    async for output in engine.generate(
+        request_id=request_id,
+        prompt=prompt,
+        sampling_params=sampling_params,
+        control_vector_request=control_vector_request
+    ):
+        if output.finished:
+            return {
+                "request_id": output.request_id,
+                "generation": output.outputs[0].text,
+            }

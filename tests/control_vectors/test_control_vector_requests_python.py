@@ -4,6 +4,10 @@ import openai
 import pytest
 import pytest_asyncio
 import requests as http_requests
+import subprocess
+import sys
+import os
+from typing import Optional
 
 from tests.utils import RemoteOpenAIServer
 
@@ -13,6 +17,33 @@ control_vector_path_happy = \
 control_vector_path_spanish = \
     "yuu-biz/qwen-cv-example/english_spanish_vector_qwen.gguf"
 spanish = "spanish"
+
+
+class PythonModuleOpenAIServer(RemoteOpenAIServer):
+    """RemoteOpenAIServer that uses python -m command instead of vllm serve"""
+
+    def _start_server(self, model: str, vllm_serve_args: list[str],
+                      env_dict: Optional[dict[str, str]]) -> None:
+        """Override to use python -m command"""
+        env = os.environ.copy()
+        env['VLLM_WORKER_MULTIPROC_METHOD'] = 'spawn'
+        if env_dict is not None:
+            env.update(env_dict)
+
+        # Build python -m command instead of vllm serve
+        serve_cmd = [
+            sys.executable, "-m", "vllm.entrypoints.openai.api_server",
+            "--model", model,
+            *vllm_serve_args
+        ]
+
+        print(f"Launching PythonModuleOpenAIServer with: {' '.join(serve_cmd)}")
+        self.proc: subprocess.Popen = subprocess.Popen(
+            serve_cmd,
+            env=env,
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
 
 
 @pytest.fixture(scope="session")
@@ -35,10 +66,10 @@ def server():
         "VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING": "1",
     }
 
-    with RemoteOpenAIServer(model=MODEL_PATH,
-                            vllm_serve_args=command,
-                            env_dict=env,
-                            auto_port=False) as server:
+    with PythonModuleOpenAIServer(model=MODEL_PATH,
+                                  vllm_serve_args=command,
+                                  env_dict=env,
+                                  auto_port=False) as server:
         yield server
 
 
@@ -49,7 +80,8 @@ async def client(server):
 
 
 @pytest.mark.asyncio
-async def test_load_control_vector(client: openai.AsyncOpenAI):
+async def test_load_control_vector_python_module(client: openai.AsyncOpenAI):
+    """Test loading control vector with python module server"""
     load_control_vector_url = "http://localhost:8000/v1/load_control_vector"
 
     header = {
@@ -66,12 +98,13 @@ async def test_load_control_vector(client: openai.AsyncOpenAI):
                                   json=params,
                                   headers=header)
 
-    print("Response from server:", response.text)
+    print("Response from python module server:", response.text)
     assert response.text == \
         "Success: Control vector 'happy' added successfully."
 
 
-def test_unload_control_vector(client: openai.AsyncOpenAI):
+def test_unload_control_vector_python_module(client: openai.AsyncOpenAI):
+    """Test unloading control vector with python module server"""
     url = "http://localhost:8000/v1/unload_control_vector"
 
     header = {
@@ -82,16 +115,14 @@ def test_unload_control_vector(client: openai.AsyncOpenAI):
                                   json={"control_vector_name": "happy"},
                                   headers=header)
 
-    print("Response from server:", response.text)
+    print("Response from python module server:", response.text)
     assert response.text == \
         "Success: control vector 'happy' removed successfully."
 
 
 @pytest.mark.asyncio
-async def test_chat_completions_control_vector(client: openai.AsyncOpenAI):
-
-    result = []
-
+async def test_chat_completions_control_vector_python_module(client: openai.AsyncOpenAI):
+    """Test chat completions with control vector using python module server"""
     response = await client.chat.completions.create(
         model=spanish,
         messages=[{
@@ -106,20 +137,18 @@ async def test_chat_completions_control_vector(client: openai.AsyncOpenAI):
         stop=["[/assistant]"],
     )
 
-    result.append(response)
     data = response.to_dict()
 
     assert "choices" in data
     assert len(data["choices"]) > 0
     assert "message" in data["choices"][0]
     assert "content" in data["choices"][0]["message"]
-    print("Response from vllm serve:", data)
+    print("Response from python module server:", data)
 
 
 @pytest.mark.asyncio
-async def test_completions_control_vector(client: openai.AsyncOpenAI):
-    result = []
-
+async def test_completions_control_vector_python_module(client: openai.AsyncOpenAI):
+    """Test completions with control vector using python module server"""
     response = await client.completions.create(
         model=spanish,
         prompt="Write a story about a dog:",
@@ -128,10 +157,9 @@ async def test_completions_control_vector(client: openai.AsyncOpenAI):
         stop=["[/assistant]"],
     )
 
-    result.append(response)
     data = response.to_dict()
 
     assert "choices" in data
     assert len(data["choices"]) > 0
     assert "text" in data["choices"][0]
-    print("Response from vllm serve:", data)
+    print("Response from python module server:", data)
