@@ -111,7 +111,7 @@ async def test_control_vector_async(monkeypatch, requests, enforce_eager: bool):
         model=MODEL_PATH,
         max_control_vectors=10,
         max_num_seqs=20,
-        gpu_memory_utilization=0.4,
+        gpu_memory_utilization=0.3,  # Reduce memory usage for tests
         enforce_eager=enforce_eager,
     )
 
@@ -147,6 +147,14 @@ async def test_control_vector_async(monkeypatch, requests, enforce_eager: bool):
         print("step result:", results)
         assert len(results) == 10
         assert all("request_id" in r and "generation" in r for r in results)
+
+    # Additional cleanup after ExitStack finishes
+    import gc
+    import torch
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
 
 async def generate_with_control_vector(engine, request_id, prompt, sampling_params, control_vector_request):
     # 1リクエスト分の生成を行い、最終出力を返す

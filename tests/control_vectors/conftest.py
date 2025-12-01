@@ -52,6 +52,12 @@ def cleanup_fixture(should_do_global_cleanup_after_test: bool):
     yield
     if should_do_global_cleanup_after_test:
         cleanup_dist_env_and_memory(shutdown_ray=True)
+        # Additional GPU memory cleanup
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
 
 
 @pytest.fixture

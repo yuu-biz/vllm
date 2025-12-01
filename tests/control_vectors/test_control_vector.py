@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: Copyright contributors to the vLLM project
 import pytest
+import torch
 
 from vllm import LLM, EngineArgs, LLMEngine, SamplingParams
 from vllm.control_vectors.request import ControlVectorRequest
@@ -126,15 +127,20 @@ def test_control_vector_adapter(requests, enforce_eager):
         enable_control_vector=True,
         max_control_vectors=10,
         max_num_seqs=20,
-        gpu_memory_utilization=0.4,
+        gpu_memory_utilization=0.3,  # Reduce memory usage for tests
         enforce_eager=enforce_eager,
     )
     engine = LLMEngine.from_engine_args(engine_args)
-    result = do_sample(engine, requests)
-    print("step result:", result)
-    assert len(result) == 10
-
-    del engine
+    try:
+        result = do_sample(engine, requests)
+        print("step result:", result)
+        assert len(result) == 10
+    finally:
+        del engine
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 @pytest.mark.parametrize("enforce_eager", [False, True])
@@ -145,19 +151,20 @@ def test_offline_inferance(requests, enforce_eager):
         enable_control_vector=True,
         max_control_vectors=10,
         max_num_seqs=20,
-        gpu_memory_utilization=0.4,
+        gpu_memory_utilization=0.3,  # Reduce memory usage for tests
         enforce_eager=enforce_eager,
     )
 
-    results = []
-    for request in requests:
-        prompt, sampling_param, control_vector_request = request
-        result = llm.generate(prompt,
-                              sampling_param,
-                              control_vector_request=control_vector_request)
-        results.append({
-            "prompt":
-            prompt,
+    try:
+        results = []
+        for request in requests:
+            prompt, sampling_param, control_vector_request = request
+            result = llm.generate(prompt,
+                                  sampling_param,
+                                  control_vector_request=control_vector_request)
+            results.append({
+                "prompt":
+                prompt,
             "generation":
             result[0].outputs[0].text,
             "control_vector_name":
@@ -167,7 +174,11 @@ def test_offline_inferance(requests, enforce_eager):
             control_vector_request.scale_factor
             if control_vector_request else None
         })
-    assert len(results) == 10
-    print("generate results:", results)
-
-    del llm
+        assert len(results) == 10
+        print("generate results:", results)
+    finally:
+        del llm
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
