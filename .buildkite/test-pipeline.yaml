@@ -328,6 +328,13 @@ steps:
   command: pytest -v -s lora --shard-id=$$BUILDKITE_PARALLEL_JOB --num-shards=$$BUILDKITE_PARALLEL_JOB_COUNT --ignore=lora/test_chatglm3_tp.py --ignore=lora/test_llama_tp.py --ignore=lora/test_llm_with_multi_loras.py
   parallelism: 4
 
+- label: Control Vector Test # 7min
+  mirror_hardwares: [amdexperimental]
+  source_file_dependencies:
+  - vllm/control_vectors
+  - tests/control_vectors
+  command: pytest -v -s control_vectors
+
 - label: PyTorch Compilation Unit Tests
   mirror_hardwares: [amdexperimental]
   torch_nightly: true
@@ -772,7 +779,7 @@ steps:
   # begin io_processor plugins test, all the code in between uses the prithvi_io_processor plugin
   - pip install -e ./plugins/prithvi_io_processor_plugin
   - pytest -v -s plugins_tests/test_io_processor_plugins.py
-  - pip uninstall prithvi_io_processor_plugin -y 
+  - pip uninstall prithvi_io_processor_plugin -y
   # end io_processor plugins test
   # other tests continue here:
   - pytest -v -s plugins_tests/test_scheduler_plugins.py
@@ -816,7 +823,7 @@ steps:
 - label: Weight Loading Multiple GPU Test  # 33min
   mirror_hardwares: [amdexperimental]
   working_dir: "/vllm-workspace/tests"
-  num_gpus: 2 
+  num_gpus: 2
   optional: true
   source_file_dependencies:
   - vllm/
