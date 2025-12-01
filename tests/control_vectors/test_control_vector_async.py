@@ -7,7 +7,7 @@ import pytest
 
 from vllm import AsyncEngineArgs, SamplingParams
 from vllm.v1.engine.async_llm import AsyncLLM
-from vllm.utils import set_default_torch_num_threads
+from vllm.utils.torch_utils import set_default_torch_num_threads
 from vllm.control_vectors.request import ControlVectorRequest
 
 MODEL_PATH = "Qwen/Qwen2.5-1.5B-Instruct"
