@@ -4871,10 +4871,10 @@ class GPUModelRunner(LoRAModelRunnerMixin, ControlVectorModelRunnerMixin,
                         self.model, self.vllm_config, self.device
                     )
                 if self.control_vector_config:
-                self.model = self.load_control_vector_model(
-                    self.model, self.control_vector_config, self.device
-                )
-            if hasattr(self, "drafter"):
+                    self.model = self.load_control_vector_model(
+                        self.model, self.control_vector_config, self.device
+                    )
+                if hasattr(self, "drafter"):
                     logger.info_once("Loading drafter model...")
                     self.drafter.load_model(self.model)
                     if (
