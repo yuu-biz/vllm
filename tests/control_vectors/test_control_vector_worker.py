@@ -36,13 +36,14 @@ def control_vector_config():
 @pytest.fixture
 def vllm_config(control_vector_config):
     """Create test VllmConfig with control vectors enabled."""
+    model_config = ModelConfig(
+        MODEL_PATH,
+        seed=0,
+        dtype="float16",
+        enforce_eager=True,
+    )
     return VllmConfig(
-        model_config=ModelConfig(
-            MODEL_PATH,
-            seed=0,
-            dtype="float16",
-            enforce_eager=True,
-        ),
+        model_config=model_config,
         load_config=LoadConfig(
             download_dir=None,
             load_format="dummy",
@@ -52,7 +53,13 @@ def vllm_config(control_vector_config):
             tensor_parallel_size=1,
             data_parallel_size=1,
         ),
-        scheduler_config=SchedulerConfig("generate", 32, 32, 32),
+        scheduler_config=SchedulerConfig(
+            max_model_len=model_config.max_model_len,
+            is_encoder_decoder=model_config.is_encoder_decoder,
+            runner_type="generate",
+            max_num_batched_tokens=32,
+            max_num_seqs=32,
+        ),
         device_config=DeviceConfig("cuda" if current_platform.is_cuda_alike() else "cpu"),
         cache_config=CacheConfig(
             block_size=16,
