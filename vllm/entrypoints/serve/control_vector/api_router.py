@@ -12,7 +12,7 @@ from vllm.entrypoints.openai.protocol import (
 )
 from vllm.entrypoints.openai.models.api_router import models
 from vllm.entrypoints.openai.models.serving import OpenAIServingModels
-from vllm.entrypoints.serve.lora.protocol import (
+from vllm.entrypoints.serve.control_vector.protocol import (
     LoadControlVectorRequest,
     UnloadControlVectorRequest,
 )
