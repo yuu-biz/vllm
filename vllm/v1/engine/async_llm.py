@@ -355,7 +355,7 @@ class AsyncLLM(EngineClient):
                 supported_tasks=await self.get_supported_tasks(),
                 arrival_time=arrival_time,
                 lora_request=lora_request,
-                control_vector_request,
+                control_vector_request=control_vector_request,
                 tokenization_kwargs=tokenization_kwargs,
                 trace_headers=trace_headers,
                 priority=priority,

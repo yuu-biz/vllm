@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request, FastAPI
 from fastapi.responses import JSONResponse, Response
 
 from vllm import envs
-from vllm.entrypoints.openai.protocol import (
+from vllm.entrypoints.openai.engine.protocol import (
     ErrorResponse,
 )
 from vllm.entrypoints.openai.models.api_router import models

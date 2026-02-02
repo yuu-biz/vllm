@@ -14,7 +14,7 @@ from vllm.entrypoints.openai.engine.protocol import (
     ModelList,
     ModelPermission,
 )
-from vllm.entrypoints.openai.models.protocol import BaseModelPath, LoRAModulePath
+from vllm.entrypoints.openai.models.protocol import BaseModelPath, LoRAModulePath, ControlVectorPath
 from vllm.entrypoints.serve.lora.protocol import (
     LoadLoRAAdapterRequest,
     UnloadLoRAAdapterRequest,
