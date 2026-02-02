@@ -31,6 +31,7 @@ from vllm.config import config
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.protocol import EngineClient
 from vllm.entrypoints.openai.api_server import init_app_state
+from vllm.entrypoints.openai.cli_args import ControlVectorParserAction
 from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -205,6 +206,16 @@ class BatchResponseData(OpenAIBaseModel):
 
     # The body of the response.
     body: AllResponse | None = None
+
+
+@config
+@dataclass
+class ControlVectorArgs:
+    control_vectors: list[ControlVectorPath] | None = None
+    """ControlVector configurations in JSON format. Example (new format):
+    `{\"name\": \"name\", \"path\": \"control_vector_path\", 
+    \"scale_factor\": \"value\", \"base_model_name\": \"id\"}`
+    "Multiple vectors can be specified."""
 
 
 class BatchRequestOutput(OpenAIBaseModel):
