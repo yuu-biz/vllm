@@ -21,6 +21,7 @@ from fastapi import UploadFile
 from prometheus_client import start_http_server
 from pydantic import Field, TypeAdapter, field_validator, model_validator
 from pydantic_core.core_schema import ValidationInfo
+from pydantic.dataclasses import dataclass
 from starlette.datastructures import State
 from starlette.responses import JSONResponse
 from tqdm import tqdm
@@ -31,7 +32,6 @@ from vllm.config import config
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.protocol import EngineClient
 from vllm.entrypoints.openai.api_server import init_app_state
-from vllm.entrypoints.openai.cli_args import ControlVectorParserAction
 from vllm.entrypoints.openai.chat_completion.protocol import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -50,6 +50,7 @@ from vllm.entrypoints.openai.speech_to_text.protocol import (
     TranslationResponse,
     TranslationResponseVerbose,
 )
+from vllm.entrypoints.openai.models.protocol import ControlVectorPath
 from vllm.entrypoints.pooling.embed.protocol import (
     EmbeddingRequest,
     EmbeddingResponse,
