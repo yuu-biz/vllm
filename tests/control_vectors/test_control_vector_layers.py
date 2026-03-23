@@ -6,7 +6,6 @@ import torch
 import torch.nn.functional as F
 from unittest.mock import patch
 
-from vllm.config import ControlVectorConfig
 from vllm.control_vectors.layers import (
     ControlVectorMapping,
     MLPWithControlVector,

@@ -6,7 +6,6 @@ from typing import Any
 
 import torch
 from pydantic import ConfigDict
-from pydantic.dataclasses import dataclass
 
 from vllm.config.utils import config
 from vllm.logger import init_logger
@@ -14,8 +13,7 @@ from vllm.logger import init_logger
 logger = init_logger(__name__)
 
 
-@config
-@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
+@config(config=ConfigDict(arbitrary_types_allowed=True))
 class ControlVectorConfig:
     """Configuration for ControlVectors."""
 

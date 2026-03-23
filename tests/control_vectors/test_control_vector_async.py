@@ -1,6 +1,3 @@
-from unittest import result
-import pytest
-
 import asyncio
 from contextlib import ExitStack
 import pytest
@@ -110,13 +107,14 @@ async def test_control_vector_async(monkeypatch, requests, enforce_eager: bool):
     engine_args = AsyncEngineArgs(
         model=MODEL_PATH,
         max_control_vectors=10,
-        max_num_seqs=20,
-        gpu_memory_utilization=0.3,  # Reduce memory usage for tests
-        enforce_eager=enforce_eager,
+        max_num_seqs=4,
+        gpu_memory_utilization=0.05,  # Reduce memory usage for tests
+        max_model_len=1024,
+        enforce_eager=enforce_eager
     )
 
     with monkeypatch.context() as m, ExitStack() as after:
-        m.setenv("VLLM_USE_V1", "1")
+        m.setenv("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
         with set_default_torch_num_threads(1):
             engine = AsyncLLM.from_engine_args(engine_args)
         after.callback(engine.shutdown)
