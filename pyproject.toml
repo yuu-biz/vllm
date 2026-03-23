@@ -111,6 +111,11 @@ markers = [
     "distributed: run this test only in distributed GPU tests",
     "optional: optional tests that are automatically skipped, include --optional to run them",
 ]
+filterwarnings = [
+    "ignore:builtin type SwigPyPacked has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type SwigPyObject has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]
 
 [tool.ty.src]
 respect-ignore-files = true
