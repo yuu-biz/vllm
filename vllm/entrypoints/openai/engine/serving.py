@@ -775,20 +775,6 @@ class OpenAIServing:
             return True
         return self.models.is_base_model(model_name)
 
-    def _get_model_name(
-        self,
-        model_name: str | None = None,
-        lora_request: LoRARequest | None = None,
-        control_vector_request: ControlVectorRequest | None = None,
-    ) -> str:
-        if lora_request:
-            return lora_request.lora_name
-        if control_vector_request is not None:
-            return control_vector_request.control_vector_name
-        if not model_name:
-            return self.models.base_model_paths[0].name
-        return model_name
-
 
 def clamp_prompt_logprobs(
     prompt_logprobs: PromptLogprobs | None,

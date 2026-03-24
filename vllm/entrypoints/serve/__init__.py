@@ -21,12 +21,12 @@ def register_vllm_serve_api_routers(app: FastAPI):
     )
 
     attach_lora_router(app)
+
     from vllm.entrypoints.serve.control_vector.api_router import (
         attach_router as attach_control_vector_router,
     )
 
-    attach_control_vector_router(app)
-    
+    attach_control_vector_router(app)    
 
     from vllm.entrypoints.serve.profile.api_router import (
         attach_router as attach_profile_router,

@@ -2041,15 +2041,6 @@ class EngineArgs:
             else None
         )
 
-        control_vector_config = (
-            ControlVectorConfig(
-                max_control_vectors=self.max_control_vectors,
-                normalize=self.normalize_control_vector,
-            )
-            if self.enable_control_vector
-            else None
-        )
-
         # bitsandbytes pre-quantized model need a specific model loader
         if model_config.quantization == "bitsandbytes":
             self.quantization = self.load_format = "bitsandbytes"

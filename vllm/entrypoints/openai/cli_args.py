@@ -287,37 +287,11 @@ class FrontendArgs(BaseFrontendArgs):
     api_key: list[str] | None = None
     """If provided, the server will require one of these keys to be presented in
     the header."""
-    lora_modules: list[LoRAModulePath] | None = None
-    """LoRA modules configurations in either 'name=path' format or JSON format
-    or JSON list format. Example (old format): `'name=path'` Example (new
-    format): `{\"name\": \"name\", \"path\": \"lora_path\",
-    \"base_model_name\": \"id\"}`"""
     control_vectors: list[ControlVectorPath] | None = None
     """ControlVector configurations in JSON format. Example (new format):
     `{\"name\": \"name\", \"path\": \"control_vector_path\", 
     \"scale_factor\": \"value\", \"base_model_name\": \"id\"}`
     "Multiple vectors can be specified."""
-    chat_template: str | None = None
-    """The file path to the chat template, or the template in single-line form
-    for the specified model."""
-    chat_template_content_format: ChatTemplateContentFormatOption = "auto"
-    """The format to render message content within a chat template.
-
-    * "string" will render the content as a string. Example: `"Hello World"`
-    * "openai" will render the content as a list of dictionaries, similar to
-      OpenAI schema. Example: `[{"type": "text", "text": "Hello world!"}]`"""
-    trust_request_chat_template: bool = False
-    """Whether to trust the chat template provided in the request. If False,
-    the server will always use the chat template specified by `--chat-template`
-    or the ones from tokenizer."""
-    default_chat_template_kwargs: dict[str, Any] | None = None
-    """Default keyword arguments to pass to the chat template renderer.
-    These will be merged with request-level chat_template_kwargs,
-    with request values taking precedence. Useful for setting default
-    behavior for reasoning models. Example: '{"enable_thinking": false}'
-    to disable thinking mode by default for Qwen3/DeepSeek models."""
-    response_role: str = "assistant"
-    """The role name to return if `request.add_generation_prompt=true`."""
     ssl_keyfile: str | None = None
     """The file path to the SSL key file."""
     ssl_certfile: str | None = None
