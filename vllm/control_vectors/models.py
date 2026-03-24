@@ -206,13 +206,13 @@ class ControlVectorModelManager:
 
     def _create_control_vector_modules(self):
         # Check if the model is multimodal
-        if supports_multimodal(self.model):
-            error_msg = (
-                "Control Vector cannot be used with multimodal models. "
-                "Please use a text-only model when enabling Control Vector."
-            )
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        # if supports_multimodal(self.model):
+        #     error_msg = (
+        #         "Control Vector cannot be used with multimodal models. "
+        #         "Please use a text-only model when enabling Control Vector."
+        #     )
+        #     logger.error(error_msg)
+        #     raise RuntimeError(error_msg)
         
         hidden_size = self.model.config.hidden_size
         dtype = self.model.config.torch_dtype
