@@ -7,7 +7,7 @@ import torch
 from unittest.mock import patch
 
 from vllm.config import (
-    CacheConfig, DeviceConfig, LoadConfig, ModelConfig,
+    CacheConfig, DeviceConfig, LoadConfig, ModelConfig, set_current_vllm_config,
     ParallelConfig, SchedulerConfig, VllmConfig, ControlVectorConfig
 )
 from vllm.control_vectors.worker_manager import (
@@ -161,8 +161,9 @@ def test_worker_apply_control_vectors(vllm_config):
     )
 
     try:
-        worker.init_device()
-        worker.load_model()
+        with set_current_vllm_config(vllm_config):
+            worker.init_device()
+            worker.load_model()
 
         # Helper function to set active control vectors
         def set_active_control_vectors(worker: Worker, cv_requests: list[ControlVectorRequest]):

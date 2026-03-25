@@ -23,6 +23,10 @@ def server():
         "--port",
         "8000",
         "--enable-control-vector",
+        "--gpu-memory-utilization",
+        "0.05",
+        "--max-model-len",
+        "1024",
         "--max-control-vectors",
         "10000",
         "--control-vectors",
@@ -31,7 +35,6 @@ def server():
     ]
 
     env = {
-        "VLLM_ENABLE_CONTROL_VECTOR": "1",
         "VLLM_ALLOW_RUNTIME_CONTROL_VECTOR_UPDATING": "1",
     }
 
@@ -51,10 +54,18 @@ async def client(server):
 @pytest.mark.asyncio
 async def test_load_control_vector(client: openai.AsyncOpenAI):
     load_control_vector_url = "http://localhost:8000/v1/load_control_vector"
+    unload_control_vector_url = "http://localhost:8000/v1/unload_control_vector"
 
     header = {
         "Content-Type": "application/json",
     }
+
+    # Ensure the test starts from a clean state.
+    http_requests.post(
+        url=unload_control_vector_url,
+        json={"control_vector_name": "happy"},
+        headers=header,
+    )
 
     params = {
         "control_vector_name": "happy",
@@ -72,14 +83,31 @@ async def test_load_control_vector(client: openai.AsyncOpenAI):
 
 
 def test_unload_control_vector(client: openai.AsyncOpenAI):
-    url = "http://localhost:8000/v1/unload_control_vector"
+    load_url = "http://localhost:8000/v1/load_control_vector"
+    unload_url = "http://localhost:8000/v1/unload_control_vector"
 
     header = {
         "Content-Type": "application/json",
     }
 
-    response = http_requests.post(url=url,
-                                  json={"control_vector_name": "happy"},
+    load_response = http_requests.post(
+        url=load_url,
+        json={
+            "control_vector_name": "happy",
+            "control_vector_path": control_vector_path_happy,
+            "control_vector_scale": 2.0,
+        },
+        headers=header,
+    )
+
+    assert load_response.status_code in (200, 400)
+    if load_response.status_code == 400:
+        assert "already been loaded" in load_response.text
+
+    response = http_requests.post(url=unload_url,
+                                  json={
+                                      "control_vector_name": "happy"
+                                  },
                                   headers=header)
 
     print("Response from server:", response.text)
