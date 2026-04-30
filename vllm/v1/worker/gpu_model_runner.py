@@ -2114,7 +2114,7 @@ class GPUModelRunner(LoRAModelRunnerMixin, ControlVectorModelRunnerMixin,
 
         # Hot-Swap control vectors
         if self.control_vector_config:
-            self.set_active_control_vectors(self.input_batch)
+            self.set_active_control_vectors(self.input_batch, num_scheduled_tokens)
 
         return (
             logits_indices,
@@ -4872,7 +4872,7 @@ class GPUModelRunner(LoRAModelRunnerMixin, ControlVectorModelRunnerMixin,
                     )
                 if self.control_vector_config:
                     self.model = self.load_control_vector_model(
-                        self.model, self.control_vector_config, self.device
+                        self.model, self.control_vector_config, self.device, max_num_batched_tokens=self.max_num_tokens,
                     )
                 if hasattr(self, "drafter"):
                     logger.info_once("Loading drafter model...")

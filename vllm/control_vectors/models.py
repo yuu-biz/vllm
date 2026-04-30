@@ -14,6 +14,7 @@ from torch import nn
 from vllm.config.control_vector import ControlVectorConfig
 from vllm.control_vectors.layers import ControlVectorMapping, MLPWithControlVector
 from vllm.model_executor.models.interfaces import supports_multimodal
+from vllm.platforms import current_platform
 from vllm.utils.cache import LRUCache
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,7 @@ class ControlVectorModel:
 
 
 class ControlVectorModelManager:
-    def __init__(self, model: nn.Module, control_vector_config: ControlVectorConfig):
+    def __init__(self, model: nn.Module, control_vector_config: ControlVectorConfig, max_num_batched_tokens: int):
         self.model = model
         self._registered_adapters = {}
         self._active_adapters = {}
@@ -135,6 +136,20 @@ class ControlVectorModelManager:
         self.model.control_vector_manager = self
         self.control_vector_index_to_id: list[int | None] = [None] * self.adapter_slots
         self.modules: dict[str, nn.Module] = {}
+
+        null_idx = self.capacity
+        self.token_slot_indices = torch.full(
+            (max_num_batched_tokens,),
+            null_idx,
+            dtype=torch.int64,
+            device=current_platform.device_type,
+        )
+
+        self._token_slot_indices_np = np.full(
+            max_num_batched_tokens, null_idx, dtype=np.int64
+        )
+        self._max_num_batched_tokens = max_num_batched_tokens
+
         self._create_control_vector_modules()
 
     @property
@@ -198,11 +213,21 @@ class ControlVectorModelManager:
                 return i
         return None
 
-    def _set_adapter_mapping(self, id: int) -> None:
-        index = self.get_index_from_id(id)
+    def _set_adapter_mapping(self, token_cv_mapping: ControlVectorMapping) -> None:
+        n = len(token_cv_mapping)
+        null_idx = self.capacity
 
-        for k, v in self.modules.items():
-            v.set_active_tensor(index)
+        for t, cv_id in enumerate(token_cv_mapping):
+            if cv_id == 0:
+                self._token_slot_indices_np[t] = null_idx
+            else:
+                slot = self.get_index_from_id(cv_id)
+                self._token_slot_indices_np[t] = null_idx if slot is None else slot
+        self._token_slot_indices_np[n:] = null_idx
+
+        self.token_slot_indices.copy_(
+            torch.from_numpy(self._token_slot_indices_np)
+        )
 
     def _create_control_vector_modules(self):
         # Check if the model is multimodal
@@ -216,6 +241,7 @@ class ControlVectorModelManager:
         
         hidden_size = self.model.config.hidden_size
         dtype = self.model.config.torch_dtype
+        max_cv_slots = self.capacity
 
         for module_name, module in self.model.named_modules():
             for key in _all_control_vector_classes:
@@ -227,7 +253,7 @@ class ControlVectorModelManager:
                     self.model,
                     module_name,
                     # _all_control_vector_classes[key](module))
-                    _all_control_vector_classes[key](module, hidden_size, dtype),
+                    _all_control_vector_classes[key](module, hidden_size, dtype, max_cv_slots,self.token_slot_indices),
                 )
                 new_module.set_layer_id(parse_number_from_string(module_name))
                 new_module.set_normalization(self.control_vector_config.normalize)
@@ -269,8 +295,9 @@ class ControlVectorModelManager:
         return True
 
     def set_adapter_mapping(self, mapping: ControlVectorMapping) -> None:
-        self._set_adapter_mapping(mapping)
-        self._last_mapping = mapping
+        if self._last_mapping != mapping:
+            self._set_adapter_mapping(mapping.layer_mapping)
+            self._last_mapping = mapping
 
     def remove_adapter(self, adapter_id: int) -> bool:
         self.deactivate_adapter(adapter_id)
@@ -297,9 +324,9 @@ class ControlVectorLRUCache(AdapterLRUCache[ControlVectorModel]):
 
 
 class LRUCacheControlVectorModelManager(ControlVectorModelManager):
-    def __init__(self, model: nn.Module, control_vector_config: ControlVectorConfig):
+    def __init__(self, model: nn.Module, control_vector_config: ControlVectorConfig, max_num_batched_tokens: int):
         self.control_vector_config = control_vector_config
-        super().__init__(model, control_vector_config)
+        super().__init__(model, control_vector_config, max_num_batched_tokens)
         self._registered_adapters = ControlVectorLRUCache(
             self.capacity, self.deactivate_adapter
         )
@@ -338,12 +365,13 @@ class LRUCacheControlVectorModelManager(ControlVectorModelManager):
 def create_control_vector_manager(
     model: nn.Module,
     control_vector_config: ControlVectorConfig,
+    max_num_batched_tokens: int,
     control_vector_manager_cls: type[
         ControlVectorModelManager
     ] = ControlVectorModelManager,
 ) -> ControlVectorModelManager:
     control_vector_manager = control_vector_manager_cls(
-        model=model, control_vector_config=control_vector_config
+        model=model, control_vector_config=control_vector_config, max_num_batched_tokens=max_num_batched_tokens,
     )
 
     return control_vector_manager

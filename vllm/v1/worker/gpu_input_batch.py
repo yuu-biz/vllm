@@ -1046,12 +1046,13 @@ class InputBatch:
 
         return prompt_lora_mapping, token_lora_mapping, active_lora_requests
 
-    def make_control_vector_inputs(self):
-        active_control_vector_requests: set[ControlVectorRequest] = set(
-            self.control_vector_id_to_control_vector_request.values()
-        )
+    def make_control_vector_inputs(self, num_scheduled_tokens: np.ndarray) -> tuple[tuple[int, ...], list[ControlVectorRequest]]:
+        req_control_vector_mapping = self.request_control_vector_mapping[: self.num_reqs]
+        token_control_vector_mapping = tuple(req_control_vector_mapping.repeat(num_scheduled_tokens))
 
-        return active_control_vector_requests
+        active_control_vector_requests: list[ControlVectorRequest] = list(self.control_vector_id_to_control_vector_request.values())
+        return token_control_vector_mapping, active_control_vector_requests
+
 
     def set_async_sampled_token_ids(
         self,

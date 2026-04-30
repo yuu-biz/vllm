@@ -6,6 +6,7 @@ from typing import Any
 import torch
 
 from vllm.config.control_vector import ControlVectorConfig
+from vllm.control_vectors.layers import ControlVectorMapping
 from vllm.control_vectors.models import (
     ControlVectorModel,
     ControlVectorModelManager,
@@ -31,12 +32,14 @@ class WorkerControlVectorManager:
         self,
         device: torch.device,
         control_vector_config: ControlVectorConfig,
+        max_num_batched_tokens: int,
         control_vector_model_cls: type[ControlVectorModel] = ControlVectorModel,
     ):
         self._adapter_manager: ControlVectorModelManager
         self._control_vector_model_cls = control_vector_model_cls
         self.control_vector_config = control_vector_config
         self.device = device
+        self._max_num_batched_tokens = max_num_batched_tokens
 
     @property
     def is_enabled(self) -> bool:
@@ -49,6 +52,7 @@ class WorkerControlVectorManager:
         control_vector_manager = create_control_vector_manager(
             model,
             control_vector_config=self.control_vector_config,
+            max_num_batched_tokens=self._max_num_batched_tokens,
             control_vector_manager_cls=self._manager_cls,
         )
         self._adapter_manager = control_vector_manager
@@ -81,10 +85,9 @@ class WorkerControlVectorManager:
     def pin_adapter(self, adapter_id: int) -> bool:
         return self._adapter_manager.pin_adapter(adapter_id)
 
-    def set_active_adapters(self, requests: set[Any]) -> None:
-        mapping = next((request.adapter_id for request in requests), None)
+    def set_active_adapters(self, requests: set[Any], token_cv_mapping: tuple[int, ...]) -> None:
         self._apply_adapters(requests)
-        self._adapter_manager.set_adapter_mapping(mapping)
+        self._adapter_manager.set_adapter_mapping(ControlVectorMapping(layer_mapping=token_cv_mapping))
 
     def add_adapter(self, adapter_request: Any) -> bool:
         if adapter_request.adapter_id in self.list_adapters():
@@ -146,6 +149,7 @@ class LRUCacheWorkerControlVectorManager(WorkerControlVectorManager):
         control_vector_manager = create_control_vector_manager(
             model,
             control_vector_config=self.control_vector_config,
+            max_num_batched_tokens=self._max_num_batched_tokens,
             control_vector_manager_cls=self._control_vector_manager_cls,
         )
         self._adapter_manager: LRUCacheControlVectorModelManager = (

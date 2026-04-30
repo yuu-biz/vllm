@@ -10,7 +10,7 @@ from vllm.platforms import current_platform
 
 @dataclass
 class ControlVectorMapping:
-    layer_mapping: dict[int, torch.Tensor]
+    layer_mapping: tuple[int, ...]
 
 
 class BaseLayerWithControlVector(nn.Module):
@@ -18,13 +18,23 @@ class BaseLayerWithControlVector(nn.Module):
 
 
 class MLPWithControlVector(BaseLayerWithControlVector):
-    def __init__(self, base_layer, hidden_size, dtype) -> None:
+    def __init__(self, base_layer, hidden_size, dtype, max_cv_slots, token_slot_indices_ref) -> None:
         super().__init__()
         self.base_layer = base_layer
         self.normalize = True
         self.control_vectors: dict[int, torch.Tensor | int] = {}
         self.hidden_size = hidden_size
         self.dtype = dtype
+        self.null_slot_idx = max_cv_slots
+
+        self.stacked_cv_weights = torch.zeros(
+            max_cv_slots + 1,
+            hidden_size,
+            dtype=dtype,
+            device=current_platform.device_type,
+        )
+
+        self.token_slot_indices_ref = token_slot_indices_ref
 
         self.active_vector = torch.zeros(
             self.hidden_size, dtype=self.dtype, device=current_platform.device_type
@@ -40,6 +50,7 @@ class MLPWithControlVector(BaseLayerWithControlVector):
     def set_control_vector(self, index: int, control_vector: torch.Tensor):
         """Set a control vector at a specific index."""
         self.control_vectors[index] = control_vector
+        self.stacked_cv_weights[index].copy_(control_vector)
 
     def get_control_vector(self, index: int) -> torch.Tensor | None:
         """Get a control vector by index."""
@@ -55,6 +66,7 @@ class MLPWithControlVector(BaseLayerWithControlVector):
                     device=current_platform.device_type,
                 )
             )
+        self.stacked_cv_weights[index].zero_()
 
     def set_active_tensor(self, index: int):
         """Sets the active vector"""
@@ -70,12 +82,12 @@ class MLPWithControlVector(BaseLayerWithControlVector):
             )
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """Forward pass with optional application of control vectors."""
+        """Forward pass with per-token application of control vectors."""
         hidden_states = self.base_layer(hidden_states)
 
         norm_pre = torch.norm(hidden_states, dim=-1, keepdim=True)
 
-        hidden_states += self.active_vector
+        hidden_states = hidden_states + self.stacked_cv_weights[self.token_slot_indices_ref[:hidden_states.shape[0]]]
 
         if self.normalize:
             norm_post = torch.norm(hidden_states, dim=-1, keepdim=True)
