@@ -188,6 +188,9 @@ class EngineCoreClient(ABC):
 
     def add_control_vector(self, cv_request: ControlVectorRequest) -> bool:
         raise NotImplementedError
+    
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        raise NotImplementedError
 
     def save_sharded_state(
         self, path: str, pattern: str | None = None, max_size: int | None = None
@@ -263,6 +266,9 @@ class EngineCoreClient(ABC):
     async def add_control_vector_async(
         self, control_vector_request: ControlVectorRequest
     ) -> bool:
+        raise NotImplementedError
+
+    async def remove_control_vector_async(self, control_vector_id: int) -> bool:
         raise NotImplementedError
 
     async def save_sharded_state_async(
@@ -357,6 +363,9 @@ class InprocClient(EngineCoreClient):
 
     def add_control_vector(self, cv_request: ControlVectorRequest) -> bool:
         return self.engine_core.add_control_vector(cv_request)
+
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        return self.engine_core.remove_control_vector(control_vector_id)
 
     def save_sharded_state(
         self, path: str, pattern: str | None = None, max_size: int | None = None
@@ -872,6 +881,9 @@ class SyncMPClient(MPClient):
     def add_control_vector(self, control_vector_request: ControlVectorRequest) -> bool:
         return self.call_utility("add_control_vector", control_vector_request)
 
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        return self.call_utility("remove_control_vector", control_vector_id)
+
     def sleep(self, level: int = 1, mode: PauseMode = "abort") -> None:
         self.call_utility("sleep", level, mode)
 
@@ -1138,6 +1150,9 @@ class AsyncMPClient(MPClient):
         return await self.call_utility_async(
             "add_control_vector", control_vector_request
         )
+
+    async def remove_control_vector_async(self, control_vector_id: int) -> bool:
+        return await self.call_utility_async("remove_control_vector", control_vector_id)
 
     async def save_sharded_state_async(
         self, path: str, pattern: str | None = None, max_size: int | None = None

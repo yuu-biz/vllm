@@ -747,6 +747,9 @@ class EngineCore:
     def add_control_vector(self, control_vector_request: ControlVectorRequest) -> bool:
         return self.model_executor.add_control_vector(control_vector_request)
 
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        return self.model_executor.remove_control_vector(control_vector_id)
+
     def save_sharded_state(
         self,
         path: str,

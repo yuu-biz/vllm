@@ -945,6 +945,10 @@ class AsyncLLM(EngineClient):
         """
         return await self.engine_core.add_control_vector_async(control_vector_request)
 
+    async def remove_control_vector(self, control_vector_id: int) -> bool:
+        """Remove an already loaded ControlVector adapter."""
+        return await self.engine_core.remove_control_vector_async(control_vector_id)
+
     async def collective_rpc(
         self,
         method: str,

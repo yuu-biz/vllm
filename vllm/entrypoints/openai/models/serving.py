@@ -451,6 +451,11 @@ class OpenAIServingModels:
             return error_check_ret
 
         control_vector_name = request.control_vector_name
+        target = next(
+            cv for cv in self.control_vector_requests
+            if cv.control_vector_name == control_vector_name
+        )
+        await self.engine_client.remove_control_vector(target.control_vector_id)    
         self.control_vector_requests = [
             control_vector_request
             for control_vector_request in self.control_vector_requests

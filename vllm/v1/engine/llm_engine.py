@@ -414,6 +414,10 @@ class LLMEngine:
         """
         return self.engine_core.add_control_vector(cv_request)
 
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        """Remove an already loaded ControlVector adapter."""
+        return self.engine_core.remove_control_vector(control_vector_id)
+
     def collective_rpc(
         self,
         method: str | Callable[[WorkerBase], _R],

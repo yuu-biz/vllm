@@ -178,6 +178,11 @@ class EngineClient(ABC):
         ...
 
     @abstractmethod
+    async def remove_control_vector(self, control_vector_id: int) -> bool:
+        """Remove an already loaded ControlVector adapter."""
+        ...
+
+    @abstractmethod
     async def pause_generation(
         self,
         *,

@@ -7,6 +7,7 @@ Define ControlVector functionality mixin for model runners.
 import gc
 
 import numpy as np
+import torch
 import torch.nn as nn
 
 from vllm.config.control_vector import ControlVectorConfig
@@ -54,4 +55,7 @@ class ControlVectorModelRunnerMixin:
     def remove_control_vector(self, control_vector_id: int) -> bool:
         if not self.control_vector_manager:
             raise RuntimeError("ControlVector is not enabled.")
-        return self.control_vector_manager.remove_adapter(control_vector_id)
+        result = self.control_vector_manager.remove_adapter(control_vector_id)
+        gc.collect()
+        torch.cuda.empty_cache()
+        return result

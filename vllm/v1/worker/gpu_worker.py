@@ -944,6 +944,9 @@ class Worker(WorkerBase):
     def add_control_vector(self, control_vector_request: ControlVectorRequest) -> bool:
         return self.model_runner.add_control_vector(control_vector_request)
 
+    def remove_control_vector(self, control_vector_id: int) -> bool:
+        return self.model_runner.remove_control_vector(control_vector_id)
+
     def check_health(self) -> None:
         # worker will always be healthy as long as it's running.
         return
