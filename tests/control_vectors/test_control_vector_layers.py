@@ -38,9 +38,11 @@ def test_mlp_with_control_vector_initialization(device, dtype):
     ).to(device=device, dtype=dtype)
 
     hidden_size = 512
+    max_cv_slots = 4
+    token_slot_indices_ref = torch.full((32,), max_cv_slots, dtype=torch.int64)
 
     # Initialize MLPWithControlVector
-    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype)
+    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype, max_cv_slots, token_slot_indices_ref)
     mlp_with_cv = mlp_with_cv.to(device=device, dtype=dtype)
 
     # Test basic properties
@@ -59,8 +61,10 @@ def test_control_vector_operations(device, dtype):
 
     base_layer = torch.nn.Linear(512, 512).to(device=device, dtype=dtype)
     hidden_size = 512
+    max_cv_slots = 4
+    token_slot_indices_ref = torch.full((32,), max_cv_slots, dtype=torch.int64)
 
-    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype)
+    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype, max_cv_slots, token_slot_indices_ref)
     mlp_with_cv = mlp_with_cv.to(device=device, dtype=dtype)
 
     # Create test control vectors
@@ -96,8 +100,10 @@ def test_control_vector_forward_pass(device, dtype):
 
     # Create base MLP layer
     base_layer = torch.nn.Linear(hidden_size, hidden_size).to(device=device, dtype=dtype)
+    max_cv_slots = 4
+    token_slot_indices_ref = torch.full((32,), max_cv_slots, dtype=torch.int64)
 
-    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype)
+    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype, max_cv_slots, token_slot_indices_ref)
     mlp_with_cv = mlp_with_cv.to(device=device, dtype=dtype)
 
     # Create input tensor
@@ -111,6 +117,7 @@ def test_control_vector_forward_pass(device, dtype):
     control_vector = torch.randn(hidden_size, dtype=dtype, device=device) * 0.1
     mlp_with_cv.set_control_vector(1, control_vector)
     mlp_with_cv.set_active_tensor(1)
+    mlp_with_cv.token_slot_indices_ref[:batch_size] = 1
 
     output_with_cv = mlp_with_cv(input_tensor)
     assert output_with_cv.shape == (batch_size, hidden_size)
@@ -154,8 +161,10 @@ def test_control_vector_dtype_handling(dtype):
     hidden_size = 256
 
     base_layer = torch.nn.Linear(hidden_size, hidden_size).to(device=device, dtype=dtype)
+    max_cv_slots = 4
+    token_slot_indices_ref = torch.full((32,), max_cv_slots, dtype=torch.int64)
 
-    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype)
+    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, dtype, max_cv_slots, token_slot_indices_ref)
     mlp_with_cv = mlp_with_cv.to(device=device, dtype=dtype)
 
     # Test that internal tensors have correct dtype
@@ -176,8 +185,10 @@ def test_control_vector_normalization():
     hidden_size = 128
 
     base_layer = torch.nn.Linear(hidden_size, hidden_size).to(device=device)
+    max_cv_slots = 4
+    token_slot_indices_ref = torch.full((32,), max_cv_slots, dtype=torch.int64)
 
-    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, torch.float32)
+    mlp_with_cv = MLPWithControlVector(base_layer, hidden_size, torch.float32, max_cv_slots, token_slot_indices_ref)
     mlp_with_cv = mlp_with_cv.to(device=device)
 
     # Test normalization setting
@@ -195,8 +206,10 @@ def test_layer_id_functionality(device):
     """Test layer ID assignment functionality."""
 
     base_layer = torch.nn.Linear(256, 256).to(device=device)
+    max_cv_slots = 4
+    token_slot_indices_ref = torch.full((32,), max_cv_slots, dtype=torch.int64)
 
-    mlp_with_cv = MLPWithControlVector(base_layer, 256, torch.float32)
+    mlp_with_cv = MLPWithControlVector(base_layer, 256, torch.float32, max_cv_slots, token_slot_indices_ref)
     mlp_with_cv = mlp_with_cv.to(device=device)
 
     # Test layer ID setting

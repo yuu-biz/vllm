@@ -110,7 +110,8 @@ def test_control_vector_model_manager(dummy_model, control_vector_config, device
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     # Test basic properties
@@ -166,7 +167,8 @@ def test_lru_cache_control_vector_model_manager(dummy_model, control_vector_conf
 
     manager = LRUCacheControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     # Test that it inherits from ControlVectorModelManager
@@ -218,7 +220,8 @@ def test_lru_control_vector_manager_capacity(dummy_model, device):
 
     manager = LRUCacheControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=config
+        control_vector_config=config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)
@@ -261,6 +264,7 @@ def test_create_control_vector_manager(dummy_model, control_vector_config):
     manager = create_control_vector_manager(
         model=dummy_model,
         control_vector_config=control_vector_config,
+        max_num_batched_tokens=32,
         control_vector_manager_cls=ControlVectorModelManager
     )
     assert isinstance(manager, ControlVectorModelManager)
@@ -270,6 +274,7 @@ def test_create_control_vector_manager(dummy_model, control_vector_config):
     lru_manager = create_control_vector_manager(
         model=dummy_model,
         control_vector_config=control_vector_config,
+        max_num_batched_tokens=32,
         control_vector_manager_cls=LRUCacheControlVectorModelManager
     )
     assert isinstance(lru_manager, LRUCacheControlVectorModelManager)
@@ -338,7 +343,8 @@ def test_control_vector_manager_capacity_limits(dummy_model, device):
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=config
+        control_vector_config=config,
+        max_num_batched_tokens=32
     )
 
     assert manager.capacity == 2
@@ -364,7 +370,8 @@ def test_control_vector_manager_empty_operations(dummy_model, control_vector_con
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     # Test operations on empty manager
@@ -393,7 +400,8 @@ def test_lru_control_vector_detailed_behavior(dummy_model, device):
 
     manager = LRUCacheControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=config
+        control_vector_config=config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)
@@ -466,7 +474,8 @@ def test_control_vector_activation_deactivation_sequence(dummy_model, control_ve
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)
@@ -519,7 +528,8 @@ def test_control_vector_multiple_operations(dummy_model, device):
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=config
+        control_vector_config=config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)
@@ -558,7 +568,8 @@ def test_control_vector_get_adapter_after_operations(dummy_model, control_vector
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)
@@ -604,7 +615,8 @@ def test_control_vector_list_adapters_consistency(dummy_model, control_vector_co
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)
@@ -657,7 +669,8 @@ def test_control_vector_capacity_edge_cases(dummy_model, device):
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=config
+        control_vector_config=config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)
@@ -684,7 +697,8 @@ def test_control_vector_duplicate_operations(dummy_model, control_vector_config,
 
     manager = ControlVectorModelManager(
         model=dummy_model,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     cv1 = create_dummy_control_vector(1, device=device)

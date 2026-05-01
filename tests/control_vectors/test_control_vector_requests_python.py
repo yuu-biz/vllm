@@ -43,6 +43,7 @@ class PythonModuleOpenAIServer(RemoteOpenAIServer):
             env=env,
             stdout=sys.stdout,
             stderr=sys.stderr,
+            start_new_session=True,
         )
 
 
@@ -55,7 +56,7 @@ def server():
         "8000",
         "--enable-control-vector",
         "--gpu-memory-utilization",
-        "0.05",
+        "0.1",
         "--max-model-len",
         "1024",
         "--max-control-vectors",

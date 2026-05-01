@@ -63,7 +63,6 @@ def vllm_config(control_vector_config):
         device_config=DeviceConfig("cuda" if current_platform.is_cuda_alike() else "cpu"),
         cache_config=CacheConfig(
             block_size=16,
-            swap_space=0,
             cache_dtype="auto",
             gpu_memory_utilization=0.05,  # Very low to avoid OOM when run after other tests
         ),
@@ -78,7 +77,8 @@ def test_worker_control_vector_manager_initialization(control_vector_config):
 
     manager = WorkerControlVectorManager(
         device=device,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     # Test basic properties
@@ -93,7 +93,8 @@ def test_lru_cache_worker_control_vector_manager_initialization(control_vector_c
 
     manager = LRUCacheWorkerControlVectorManager(
         device=device,
-        control_vector_config=control_vector_config
+        control_vector_config=control_vector_config,
+        max_num_batched_tokens=32
     )
 
     # Test that it inherits from WorkerControlVectorManager
@@ -115,7 +116,8 @@ def test_worker_control_vector_manager_different_capacities(max_control_vectors)
 
     manager = WorkerControlVectorManager(
         device=device,
-        control_vector_config=config
+        control_vector_config=config,
+        max_num_batched_tokens=32
     )
 
     # Verify manager created successfully with specified capacity
@@ -167,7 +169,8 @@ def test_worker_apply_control_vectors(vllm_config):
 
         # Helper function to set active control vectors
         def set_active_control_vectors(worker: Worker, cv_requests: list[ControlVectorRequest]):
-            worker.model_runner.control_vector_manager.set_active_adapters(set(cv_requests))
+            token_cv_mapping: tuple[int, ...] = ()
+            worker.model_runner.control_vector_manager.set_active_adapters(set(cv_requests), token_cv_mapping)
 
         # Test 1: Empty state
         set_active_control_vectors(worker, [])

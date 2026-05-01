@@ -24,7 +24,7 @@ def server():
         "8000",
         "--enable-control-vector",
         "--gpu-memory-utilization",
-        "0.05",
+        "0.1",
         "--max-model-len",
         "1024",
         "--max-control-vectors",
